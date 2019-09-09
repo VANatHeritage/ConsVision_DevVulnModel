@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-08-08
-# Last Edit: 2019-07-30
+# Last Edit: 2019-09-06
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -12,6 +12,8 @@
 
 # Import modules
 import os, sys, traceback, numpy
+from datetime import datetime as datetime 
+
 try:
    arcpy
    print "Arcpy is already loaded"
@@ -19,7 +21,8 @@ except:
    print "Initiating arcpy, which takes longer than it should..."
    import arcpy   
 
-from datetime import datetime as datetime   
+from arcpy.sa import *
+arcpy.CheckOutExtension ('Spatial')  
    
 # Set overwrite option so that existing data may be overwritten
 arcpy.env.overwriteOutput = True
@@ -393,3 +396,37 @@ def ProjectToMatch(in_Feats, in_Template, out_Feats):
          geoTrans = transList[0]
       arcpy.Project_management (in_Feats, out_Feats, srTemplate, geoTrans)
    return out_Feats
+   
+def ProjectRasterToMatch(in_Raster, in_Template, out_Raster, resample_Type = "NEAREST"):
+   '''Check if input raster and template raster have same spatial reference.
+   If so, make a copy. If not, reproject raster to match template.
+   NOTE: If the coordinate system name is the same but the coordinate system actually differs, this will not help you. It assumes that if the name is the same, the coordinate system is the same.
+   Parameters:
+   - in_Raster = input raster to be reprojected or copied
+   - in_Template = dataset used to determine desired spatial reference, as well as snap alignment
+   - out_raster = output raster resulting from copy or reprojection
+   - resample_Type = the type of resampling to use when reprojecting
+		- NEAREST
+		- BILINEAR
+		- CUBIC
+		- MAJORITY
+   '''
+   
+   srRast = arcpy.Describe(in_Rast).spatialReference
+   srTemplate = arcpy.Describe(in_Template).spatialReference
+   arcpy.env.snapRaster = in_Template
+   
+   if srRast.Name == srTemplate.Name:
+      printMsg('Coordinate systems for input and template data are the same. Copying...')
+      arcpy.CopyRaster_management (in_Raster, out_Raster)
+   else:
+      printMsg('Reprojecting raster to match template...')
+      # Check if geographic transformation is needed, and handle accordingly.
+      if srRast.GCS.Name == srTemplate.GCS.Name:
+         geoTrans = ""
+         printMsg('No geographic transformation needed...')
+      else:
+         transList = arcpy.ListTransformations(srRast,srTemplate)
+         geoTrans = transList[0]
+      ProjectRaster_management (in_Raster, out_Raster, in_Template, resample_Type, "", geoTrans)
+   return out_Raster
