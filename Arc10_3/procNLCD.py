@@ -63,4 +63,3 @@ def MakeWeightKernel(out_File, nCells, gamma, scale = 100, rounding = 0, ysnInt 
 	
 	return (s, d, weight, normWt)
 
-def FocalInfluence
