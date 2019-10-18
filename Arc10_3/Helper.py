@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-08-08
-# Last Edit: 2019-09-06
+# Last Edit: 2019-10-02
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -430,3 +430,18 @@ def ProjectRasterToMatch(in_Raster, in_Template, out_Raster, resample_Type = "NE
          geoTrans = transList[0]
       ProjectRaster_management (in_Raster, out_Raster, in_Template, resample_Type, "", geoTrans)
    return out_Raster
+   
+def MapCode2FileName(mapCode):
+	'''Because map codes for the USGS 1x1-degree cell reference don't match the file names with which they correspond spatially (WHY????), this function creates the string for the correct basename of the file.
+	
+	Sample map code: 38082-A1
+	Corresponding file basename: n39w083
+	'''
+	lat = int(mapCode[:2])
+	lat += 1
+	lat = str(lat).zfill(2)
+	lon = int(mapCode[2:5])
+	lon += 1
+	lon = str(lon).zfill(3)
+	basename = "n%sw%s" %(lat, lon)
+	return basename
