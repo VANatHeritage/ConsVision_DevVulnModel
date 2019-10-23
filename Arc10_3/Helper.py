@@ -16,9 +16,9 @@ from datetime import datetime as datetime
 
 try:
    arcpy
-   print "Arcpy is already loaded"
+   print("Arcpy is already loaded")
 except:
-   print "Initiating arcpy, which takes longer than it should..."
+   print("Initiating arcpy, which takes longer than it should...")
    import arcpy   
 
 from arcpy.sa import *
@@ -39,15 +39,15 @@ def getScratchMsg(scratchGDB):
    
 def printMsg(msg):
    arcpy.AddMessage(msg)
-   print msg
+   print(msg)
    
 def printWrng(msg):
    arcpy.AddWarning(msg)
-   print 'Warning: ' + msg
+   print('Warning: ' + msg)
    
 def printErr(msg):
    arcpy.AddError(msg)
-   print 'Error: ' + msg
+   print('Error: ' + msg)
 
 def garbagePickup(trashList):
    '''Deletes Arc files in list, with error handling. Argument must be a list.'''
@@ -89,7 +89,8 @@ def CleanFeatures(inFeats, outFeats):
    return outFeats
 
 def CleanClip(inFeats, clipFeats, outFeats, scratchGDB = "in_memory"):
-   '''Clips the Input Features with the Clip Features.  The resulting features are then subjected to geometry repair and exploded (eliminating multipart polygons)'''
+   '''Clips the Input Features with the Clip Features.  The resulting features are then subjected to geometry repair
+   and exploded (eliminating multipart polygons) '''
    # # Determine where temporary data are written
    # msg = getScratchMsg(scratchGDB)
    # arcpy.AddMessage(msg)
@@ -108,7 +109,7 @@ def CleanClip(inFeats, clipFeats, outFeats, scratchGDB = "in_memory"):
    return outFeats
    
 def CleanErase(inFeats, eraseFeats, outFeats, scratchGDB = "in_memory"):
-   '''Uses Eraser Features to erase portions of the Input Features, then repairs geometry and explodes any multipart polygons.'''
+   """Uses Eraser Features to erase portions of the Input Features, then repairs geometry and explodes any multipart polygons."""
    # # Determine where temporary data are written
    # msg = getScratchMsg(scratchGDB)
    # arcpy.AddMessage(msg)
@@ -127,7 +128,7 @@ def CleanErase(inFeats, eraseFeats, outFeats, scratchGDB = "in_memory"):
    return outFeats
    
 def countFeatures(features):
-   '''Gets count of features'''
+   """Gets count of features"""
    count = int((arcpy.GetCount_management(features)).getOutput(0))
    return count
    
@@ -430,3 +431,29 @@ def ProjectRasterToMatch(in_Raster, in_Template, out_Raster, resample_Type = "NE
          geoTrans = transList[0]
       ProjectRaster_management (in_Raster, out_Raster, in_Template, resample_Type, "", geoTrans)
    return out_Raster
+
+
+def make_gdb(path):
+   """ Creates a geodatabase if it doesn't exist"""
+   path = path.replace("\\", "/")
+   if '.gdb' not in path:
+      print("Bad geodatabase path name.")
+      return False
+   folder = path[0:path.rindex("/")]
+   name = path[(path.rindex("/") + 1):len(path)]
+   if not os.path.exists(path):
+      try:
+         arcpy.CreateFileGDB_management(folder, name)
+      except:
+         return False
+      else:
+         print("Geodatabase '" + path + "' created.")
+         return True
+   else:
+      return True
+
+
+def make_gdb_name(string):
+   """Makes strings GDB-compliant"""
+   nm = re.sub('[^A-Za-z0-9]+', '_', string)
+   return nm
