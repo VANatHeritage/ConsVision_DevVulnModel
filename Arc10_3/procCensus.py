@@ -2,7 +2,7 @@
 # procCensus.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2019-10-11
-# Last Edit: 2019-10-18
+# Last Edit: 2019-10-23
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -238,6 +238,7 @@ def MakeUrbanCores2(in_Blocks, in_Tracts, out_Cores):
    where_clause = "POP <> 0"
    printMsg('Selecting populated blocks within core tracts...')
    arcpy.MakeFeatureLayer_management(in_Blocks, 'lyr_PrimaryBlocks', where_clause)
+   arcpy.SelectLayerByLocation_management ('lyr_PrimaryBlocks', 'WITHIN', coreTracts, '', 'NEW_SELECTION')
    arcpy.CopyFeatures_management('lyr_PrimaryBlocks', coreBlocks)
    
    # Select census blocks with population density at least 1000 ppsm that are adjacent to initial urban cores
@@ -249,7 +250,7 @@ def MakeUrbanCores2(in_Blocks, in_Tracts, out_Cores):
    c = countSelectedFeatures('lyr_SecondaryBlocks')
    if c > 0:
       arcpy.Append_management ('lyr_SecondaryBlocks', coreBlocks)
-   ### Above code accomplishes first paragraph (with slight modification), creating initial cores.
+   ### Above code accomplishes first paragraph of Census protocol (with slight modification), creating initial cores.
    ### Now start a loop to continue expanding.
    
    # Continue to add blocks meeting density and/or imperviousness criteria, that are adjacent to expanding urban cores
@@ -271,17 +272,19 @@ def MakeUrbanCores2(in_Blocks, in_Tracts, out_Cores):
    # Dissolve cores
    dissCores = scratchGDB + os.sep + "dissCores"
    printMsg('Dissolving features...')
-   arcpy.Dissolve_management(expandCores, dissCores, "", "", "SINGLE_PART")
+   arcpy.Dissolve_management(expandCores, dissCores, "", "", "MULTI_PART")
    
-   # Fill holes
+   # Fill holes and remove polygons smaller than 1 square mile
    fillCores = scratchGDB + os.sep + "fillCores"
-   printMsg('Eliminating gaps...')
-   arcpy.EliminatePolygonPart_management(dissCores, fillCores, "AREA", "5 SquareMiles", "", "CONTAINED_ONLY")
+   printMsg('Eliminating gaps and eliminating runts...')
+   arcpy.EliminatePolygonPart_management(dissCores, fillCores, "AREA", "1 SquareMiles", "", "ANY")
    
-   # Coalesce disjunct cores that should group together
+   # Group disjunct but nearby cores that should group together
+   buffCores = scratchGDB + os.sep + "buffCores"
    grpCores = scratchGDB + os.sep + "grpCores"
    printMsg('Grouping cores...')
-   Coalesce(fillCores, "0.25 Miles", grpCores)
+   arcpy.Buffer_analysis (fillCores, buffCores, "0.25 Miles", "", "", "ALL")
+   arcpy.MultipartToSinglepart_management (buffCores, grpCores) 
    
    # Generate CORE_ID field 
    printMsg('Adding CORE_ID field...')
@@ -292,7 +295,78 @@ def MakeUrbanCores2(in_Blocks, in_Tracts, out_Cores):
    # Attach CORE_ID to blocks
    tmpBlocks = scratchGDB + os.sep + "tmpBlocks"
    printMsg('Performing spatial join...')
-   arcpy.SpatialJoin_analysis (in_Blocks, fillCores, tmpBlocks, "JOIN_ONE_TO_ONE", "KEEP_COMMON", "", "WITHIN")
+   arcpy.SpatialJoin_analysis (in_Blocks, grpCores, tmpBlocks, "JOIN_ONE_TO_ONE", "KEEP_COMMON", "", "WITHIN")
+   
+   printMsg('Summarizing population and area...')
+   arcpy.Dissolve_management(tmpBlocks, out_Cores, "CORE_ID", "POP SUM;AREA_SQMI SUM", "MULTI_PART")
+   arcpy.AlterField_management(out_Cores, "SUM_POP", "POP")
+   arcpy.AlterField_management(out_Cores, "SUM_AREA_SQMI", "AREA_SQMI")
+   
+   printMsg('Finished making cores.')
+   return out_Cores
+      
+def MakeUrbanCores3(in_Blocks, out_Cores):
+   '''Creates urban cores from input census blocks and tracts, based on the first paragraph of Section 1 on page 53040 of the "Urban Area Criteria for the 2010 Census" (https://www.federalregister.gov/documents/2011/08/24/2011-21647/urban-area-criteria-for-the-2010-census).
+   Parameters:
+   - in_Blocks: Input feature class representing Census blocks; this should have been updated using the PrepBlocks function
+   - out_Cores: Output feature class representing urban cores
+   '''
+   scratchGDB = arcpy.env.scratchGDB
+   coreBlocks = scratchGDB + os.sep + 'coreBlocks'
+   expandCores = scratchGDB + os.sep + "expandCores"
+   
+   # Select census blocks with population density at least 1000 ppsm 
+   # Later added criterion that size must be not smaller than four 30-m pixels, to avoid spurious cores
+   where_clause = "DENS_PPSM >= 1000 AND Shape_Area >= 3600" 
+   printMsg('Selecting high-density blocks to initiate cores...')
+   arcpy.MakeFeatureLayer_management(in_Blocks, 'lyr_PrimaryBlocks', where_clause)
+   arcpy.CopyFeatures_management('lyr_PrimaryBlocks', coreBlocks)
+   
+   # Continue to add blocks meeting density and/or imperviousness criteria, that are adjacent to expanding urban cores
+   arcpy.CopyFeatures_management(coreBlocks, expandCores)
+   where_clause = "(DENS_PPSM >= 500) OR (IMPERV_MEAN >= 20 AND SHP_IDX >= 0.185) OR (IMPERV20_MEAN >= 0.33 AND SHP_IDX >= 0.185)"
+   printMsg('Selecting additional adjacent blocks to expand cores...')
+   arcpy.MakeFeatureLayer_management(in_Blocks, 'lyr_SecondaryBlocks', where_clause)
+   arcpy.SelectLayerByLocation_management ('lyr_SecondaryBlocks', 'WITHIN_A_DISTANCE', expandCores, '0 METERS', 'NEW_SELECTION')
+   arcpy.SelectLayerByLocation_management ('lyr_SecondaryBlocks', 'ARE_IDENTICAL_TO', expandCores, '', 'REMOVE_FROM_SELECTION')
+   c = countSelectedFeatures('lyr_SecondaryBlocks')
+   while c > 0:
+      printMsg('Continuing to expand cores with %s additional blocks...'%str(c))
+      arcpy.Append_management ('lyr_SecondaryBlocks', expandCores)
+      arcpy.SelectLayerByLocation_management ('lyr_SecondaryBlocks', 'WITHIN_A_DISTANCE', expandCores, '0 METERS', 'NEW_SELECTION')
+      arcpy.SelectLayerByLocation_management ('lyr_SecondaryBlocks', 'ARE_IDENTICAL_TO', expandCores, '', 'REMOVE_FROM_SELECTION')
+      c = countSelectedFeatures('lyr_SecondaryBlocks')
+   printMsg('Finished expanding cores.')   
+   
+   # Dissolve cores
+   dissCores = scratchGDB + os.sep + "dissCores"
+   printMsg('Dissolving features...')
+   arcpy.Dissolve_management(expandCores, dissCores, "", "", "MULTI_PART")
+   
+   # Remove small holes and polygons
+   fillCores = scratchGDB + os.sep + "fillCores"
+   printMsg('Eliminating gaps and runts...')
+   arcpy.EliminatePolygonPart_management(dissCores, fillCores, "AREA", "1 SquareMiles", "", "ANY")
+   
+   # Group disjunct but nearby cores
+   buffCores = scratchGDB + os.sep + "buffCores"
+   grpCores = scratchGDB + os.sep + "grpCores"
+   printMsg('Grouping cores...')
+   arcpy.Buffer_analysis (fillCores, buffCores, "0.25 Miles", "", "", "ALL")
+   arcpy.MultipartToSinglepart_management (buffCores, grpCores) 
+   
+   # Generate CORE_ID field 
+   printMsg('Adding CORE_ID field...')
+   arcpy.AddField_management(grpCores, "CORE_ID", "LONG")
+   expression = "!OBJECTID!"
+   arcpy.CalculateField_management(grpCores, "CORE_ID", expression, "PYTHON_9.3") 
+   
+   # Attach CORE_ID to relevant blocks
+   tmpBlocks = scratchGDB + os.sep + "tmpBlocks"
+   arcpy.MakeFeatureLayer_management(in_Blocks, 'lyr_coreBlocks')
+   arcpy.SelectLayerByLocation_management ('lyr_coreBlocks', 'WITHIN', fillCores, '', 'NEW_SELECTION')
+   printMsg('Performing spatial join...')
+   arcpy.SpatialJoin_analysis ('lyr_coreBlocks', grpCores, tmpBlocks, "JOIN_ONE_TO_ONE", "KEEP_COMMON", "", "WITHIN")
    
    # Get population and area for each urban core
    printMsg('Summarizing population and area...')
@@ -302,7 +376,6 @@ def MakeUrbanCores2(in_Blocks, in_Tracts, out_Cores):
    
    printMsg('Finished making cores.')
    return out_Cores
-      
    
 ### Use the main function below to run desired function(s) directly from Python IDE or command line with hard-coded variables
 def main():
@@ -316,12 +389,14 @@ def main():
    in_Year = 2000
    in_Tracts = out_Tracts
    out_Cores = r'C:\Users\xch43889\Documents\Working\ConsVision\VulnMod\CensusWork2000.gdb\UrbanCores2000'
+   out_Cores3 = r'C:\Users\xch43889\Documents\Working\ConsVision\VulnMod\CensusWork2000.gdb\UrbanCores2000_method3'
 
    # End of variable input
 
    # Specify function(s) to run below
    #PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Imperv20, out_Tracts, in_Year)
-   MakeUrbanCores2(in_Blocks, in_Tracts, out_Cores)
+   #MakeUrbanCores2(in_Blocks, in_Tracts, out_Cores)
+   MakeUrbanCores3(in_Blocks, out_Cores3)
    
 if __name__ == '__main__':
    main()
