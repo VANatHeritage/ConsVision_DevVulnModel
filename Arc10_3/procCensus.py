@@ -31,58 +31,58 @@ def PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Imperv20, out_Tracts, in_Year
    - in_Year: The census year of the data
    '''
    
-   # # Change the relevant field name to POP, if not already done
-   # if len(arcpy.ListFields(in_PopTab,"POP"))<1:
-      # printMsg('Renaming field to POP...')
-      # if in_Year == 2000:
-         # arcpy.AlterField_management (in_PopTab, 'FXS001', 'POP', 'POP')
-      # elif in_Year == 2010:
-         # arcpy.AlterField_management (in_PopTab, 'H7V001', 'POP', 'POP')
-      # else:
-         # printErr('Not a valid year.')
+   # Change the relevant field name to POP, if not already done
+   if len(arcpy.ListFields(in_PopTab,"POP"))<1:
+      printMsg('Renaming field to POP...')
+      if in_Year == 2000:
+         arcpy.AlterField_management (in_PopTab, 'FXS001', 'POP', 'POP')
+      elif in_Year == 2010:
+         arcpy.AlterField_management (in_PopTab, 'H7V001', 'POP', 'POP')
+      else:
+         printErr('Not a valid year.')
    
-   # # Join fields from the population table to the feature class
-   # fnames = [f.name for f in arcpy.ListFields(in_PopTab)]
-   # fnames.remove('GISJOIN')
-   # fnames.remove('OBJECTID')
-   # printMsg('Joining fields...')
-   # arcpy.JoinField_management (in_Blocks, 'GISJOIN', in_PopTab, 'GISJOIN', fnames)  
+   # Join fields from the population table to the feature class
+   fnames = [f.name for f in arcpy.ListFields(in_PopTab)]
+   fnames.remove('GISJOIN')
+   fnames.remove('OBJECTID')
+   printMsg('Joining fields...')
+   arcpy.JoinField_management (in_Blocks, 'GISJOIN', in_PopTab, 'GISJOIN', fnames)  
 
-   # # Get a unique tract ID
-   # printMsg('Creating and calculating TRACT_ID field...')
-   # arcpy.AddField_management(in_Blocks, "TRACT_ID", "TEXT", "", "", 11)
-   # if in_Year == 2000:
-      # expression = "!FIPSSTCO!+ !TRACT2000!"
-   # elif in_Year == 2010:
-      # expression = "!STATEFP10!+ !COUNTYFP10! + !TRACTCE10!"
-   # else:
-      # printErr('Not a valid year.')
-   # arcpy.CalculateField_management(in_Blocks, "TRACT_ID", expression, "PYTHON_9.3") 
+   # Get a unique tract ID
+   printMsg('Creating and calculating TRACT_ID field...')
+   arcpy.AddField_management(in_Blocks, "TRACT_ID", "TEXT", "", "", 11)
+   if in_Year == 2000:
+      expression = "!FIPSSTCO!+ !TRACT2000!"
+   elif in_Year == 2010:
+      expression = "!STATEFP10!+ !COUNTYFP10! + !TRACTCE10!"
+   else:
+      printErr('Not a valid year.')
+   arcpy.CalculateField_management(in_Blocks, "TRACT_ID", expression, "PYTHON_9.3") 
       
-   # # Calculate the area in square miles, and change the output field name.
-   # printMsg('Calculating area...')
-   # arcpy.AddGeometryAttributes_management (in_Blocks, "AREA", "", "SQUARE_MILES_US")
-   # arcpy.AlterField_management (in_Blocks, 'POLY_AREA', 'AREA_SQMI', 'AREA_SQMI')
+   # Calculate the area in square miles, and change the output field name.
+   printMsg('Calculating area...')
+   arcpy.AddGeometryAttributes_management (in_Blocks, "AREA", "", "SQUARE_MILES_US")
+   arcpy.AlterField_management (in_Blocks, 'POLY_AREA', 'AREA_SQMI', 'AREA_SQMI')
    
-   # # Calculate the population density in persons per square mile
-   # printMsg('Calculating population density...')
-   # arcpy.AddField_management(in_Blocks, "DENS_PPSM", "DOUBLE")
-   # expression = "!POP! / !AREA_SQMI!"
-   # arcpy.CalculateField_management(in_Blocks, "DENS_PPSM", expression, "PYTHON_9.3") 
+   # Calculate the population density in persons per square mile
+   printMsg('Calculating population density...')
+   arcpy.AddField_management(in_Blocks, "DENS_PPSM", "DOUBLE")
+   expression = "!POP! / !AREA_SQMI!"
+   arcpy.CalculateField_management(in_Blocks, "DENS_PPSM", expression, "PYTHON_9.3") 
    
-   # # Calculate the shape index
-   # printMsg('Calculating shape index...')
-   # arcpy.AddField_management(in_Blocks, "SHP_IDX", "DOUBLE")
-   # expression = "(4*math.pi* !Shape_Area!)/(!Shape_Length!**2)"
-   # arcpy.CalculateField_management(in_Blocks, "SHP_IDX", expression, "PYTHON_9.3") 
+   # Calculate the shape index
+   printMsg('Calculating shape index...')
+   arcpy.AddField_management(in_Blocks, "SHP_IDX", "DOUBLE")
+   expression = "(4*math.pi* !Shape_Area!)/(!Shape_Length!**2)"
+   arcpy.CalculateField_management(in_Blocks, "SHP_IDX", expression, "PYTHON_9.3") 
    
-   # # Calculate the imperviousness
-   # printMsg('Calculating imperviousness...')
-   # zTab = in_Blocks + '_Imperv'
-   # ZonalStatisticsAsTable (in_Blocks, 'GISJOIN', in_Imperv, zTab, "DATA", "ALL")
-   # arcpy.JoinField_management (in_Blocks, 'GISJOIN', zTab, 'GISJOIN', ['MEAN', 'MEDIAN'])  
-   # arcpy.AlterField_management (in_Blocks, 'MEAN', 'IMPERV_MEAN')
-   # arcpy.AlterField_management (in_Blocks, 'MEDIAN', 'IMPERV_MEDIAN')
+   # Calculate the imperviousness
+   printMsg('Calculating imperviousness...')
+   zTab = in_Blocks + '_Imperv'
+   ZonalStatisticsAsTable (in_Blocks, 'GISJOIN', in_Imperv, zTab, "DATA", "ALL")
+   arcpy.JoinField_management (in_Blocks, 'GISJOIN', zTab, 'GISJOIN', ['MEAN', 'MEDIAN'])  
+   arcpy.AlterField_management (in_Blocks, 'MEAN', 'IMPERV_MEAN')
+   arcpy.AlterField_management (in_Blocks, 'MEDIAN', 'IMPERV_MEDIAN')
    
    # Calculate the proportion of polygon covered by 20% or greater imperviousness
    printMsg('Calculating proportion with 20% or greater imperviousness...')
