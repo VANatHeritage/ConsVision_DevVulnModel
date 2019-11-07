@@ -2,13 +2,14 @@
 # procNLCD.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2019-09-05
-# Last Edit: 2019-09-11
+# Last Edit: 2019-11-07
 # Creator:  Kirsten R. Hazler
 
 # Summary:
 # A library of functions for processing National Land Cover Database data 
 # ----------------------------------------------------------------------------------------
 
+# Import modules and functions
 import Helper
 from Helper import *
 
