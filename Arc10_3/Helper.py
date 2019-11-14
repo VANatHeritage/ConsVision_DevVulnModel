@@ -135,7 +135,10 @@ def countFeatures(features):
 def countSelectedFeatures(featureLyr):
    '''Gets count of selected features in a feature layer'''
    desc = arcpy.Describe(featureLyr)
-   count = len(desc.FIDSet)
+   if desc.FIDSet == '':
+      count = 0
+   else:
+      count = len(desc.FIDSet.split(';'))
    return count
 
 def unique_values(table, field):
