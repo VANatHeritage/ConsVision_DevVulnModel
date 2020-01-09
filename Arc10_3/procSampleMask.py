@@ -20,7 +20,7 @@ arcpy.env.scratchWorkspace = 'L:/scratch'
 # year for mask
 year = '2006'
 # output raster name
-outRast = 'L:/David/projects/vulnerability_model/sampling_mask/sampMask_' + year + 'Test.tif'
+outRast = 'L:/David/projects/vulnerability_model/sampling_mask/sampMask_' + year + '.tif'
 
 # set environments
 msk = 'C:/David/scratch/jurisbnd_lam_clipbound.shp'
