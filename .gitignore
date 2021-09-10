@@ -2,5 +2,10 @@
 .idea/
 # compiled py
 *.pyc
-
-ArcPro/
+# RStudio
+.Rproj.user
+.Rhistory
+*.Rproj
+# ArcGIS project folder
+ArcGIS/
+recycling.py
