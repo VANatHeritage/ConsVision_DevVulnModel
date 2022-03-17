@@ -8,7 +8,8 @@ Creator:  Kirsten R. Hazler
 Summary:
 A library of functions for processing U.S. Census data
 FUNCTION NOTE: It is a little tricky to make a general function to process data from all years, since field names and
-formats differ. Therefore, certain lines of code are contingent on the year specified. Whenever new data is downloaded, some of the code may need adjusting.
+formats differ. Therefore, certain lines of code are contingent on the year specified. Whenever new data is downloaded,
+some of the code may need adjusting.
 
 DATA NOTE:  To cover the 50-mile processing buffer around Virginia, download data for the following states:
 DE, DC, KY, MD, NC, PA, TN, VA, WV

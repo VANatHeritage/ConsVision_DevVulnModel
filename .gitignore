@@ -1,13 +1,17 @@
 # pyCharm
 .idea/
+
 # compiled py
 *.pyc
+
 # RStudio
 .Rproj.user
 .Rhistory
 *.Rproj
-# ArcGIS project folder
+
+# folders
 ArcGIS/
 recycling/
-# folders
 ref
+R_ancillary
+agol
