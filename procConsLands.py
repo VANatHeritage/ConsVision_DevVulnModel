@@ -1,18 +1,16 @@
-# ---------------------------------------------------------------------------
-# ProcConsLands.py
-# Version:  ArcGIS 10.3 / Python 2.7
-# Creation Date: 2019-06-19
-# Last Edit: 2019-11-07
-# Creators:  Kirsten R. Hazler
-# Notes: Borrowed from ProcConsLands.py from ConSiteTools repo
-#
-# Summary: Creates flattened feature class and raster versions of
-# conservation lands, based on BMI and LPS attributes.
-# ---------------------------------------------------------------------------
+"""
+procConsLands.py
+Version:  ArcGIS 10.3 / Python 2.7
+Creation Date: 2019-06-19
+Last Edit: 2019-11-07
+Creators:  Kirsten R. Hazler / David Bucklin
+Notes: Borrowed from ProcConsLands.py from ConSiteTools repo
 
-# Import modules and functions
+Summary: Processing for conservation lands data for the Development Vulnerability model. Includes creating flattened
+feature class and raster versions of conservation lands, based on BMI and LPS attributes, development of a euclidean
+distance to conservation lands predictor variable, and creation of a protection multiplier raster.
+"""
 from Helper import *
-arcpy.env.overwriteOutput = True
 
 
 def polyFlatten(inPolys, outPolys, field, values=None, scratchGDB=None):
@@ -68,52 +66,116 @@ def polyFlatten(inPolys, outPolys, field, values=None, scratchGDB=None):
    return outPolys
 
 
+def protMult(bmi, lps, outRast, nlcd=None):
+   # If given, NLCD will set open water areas to 0 in outRast.
+
+   print('Making protection multiplier raster...')
+   if nlcd:
+      arcpy.sa.Con(nlcd, 0, 1, 'Value = 11').save('tmp_water')
+      water = arcpy.sa.Raster('tmp_water')
+      (water * (0.5 * ((arcpy.sa.Raster(bmi) - 1) / 5 + (arcpy.sa.Raster(lps) - 1) / 4))).save('tmp_mult')
+   else:
+      (0.5 * ((arcpy.sa.Raster(bmi) - 1) / 5 + (arcpy.sa.Raster(lps) - 1) / 4)).save('tmp_mult')
+   print('Multiplying by 100 and converting to integer...')
+   arcpy.sa.Int(arcpy.sa.Raster('tmp_mult') * 100 + 0.5).save(outRast)
+
+   return outRast
+
+
+def protMultBMI(bmi, outRast, nlcd=None):
+   # If given, NLCD will set open water areas to 0 in outRast.
+
+   print('Making protection multiplier raster...')
+   if nlcd:
+      arcpy.sa.Con(nlcd, 0, 1, 'Value = 11').save('tmp_water')
+      water = arcpy.sa.Raster('tmp_water')
+      (water * ((arcpy.sa.Raster(bmi) - 1) / 5)).save('tmp_mult')
+   else:
+      ((arcpy.sa.Raster(bmi) - 1) / 5).save('tmp_mult')
+   print('Multiplying by 100 and converting to integer...')
+   arcpy.sa.Int(arcpy.sa.Raster('tmp_mult') * 100 + 0.5).save(outRast)
+
+   return outRast
+
+
 def main():
 
    # set environments
-   snap = r'L:\David\projects\vulnerability_model\SnapRaster_albers_wgs84.tif\SnapRaster_albers_wgs84.tif'
-   msk = r'E:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb\VA_ModelMask'
+   snap = r'F:\David\projects\vulnerability_model\SnapRaster_albers_wgs84.tif\SnapRaster_albers_wgs84.tif'
+   msk = r'D:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb\VA_ModelMask'
 
-   arcpy.env.workspace = r'E:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb'
+   arcpy.env.workspace = r'D:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb'
    arcpy.env.mask = msk
    arcpy.env.extent = msk
    arcpy.env.snapRaster = snap
    arcpy.env.outputCoordinateSystem = snap
    arcpy.env.cellSize = snap
+   arcpy.env.overwriteOutput = True
 
-   # Output directory
-   out_dir = r'L:\David\projects\vulnerability_model\conslands'
+   # Output gdb
+   out_dir = r'F:\David\projects\vulnerability_model\vars\non_nlcd_based\conslands'
+   out_gdb = out_dir + os.sep + 'conslands.gdb'
+   make_gdb(out_gdb)
+   arcpy.env.workspace = out_gdb
+
+   # PAD and extended boundary for selecting out of state PAs
+   pad = r'F:\David\GIS_data\PAD\PAD_US2_1_GDB\PAD_US2_1.gdb\PADUS2_1Fee'
+   bnd = r'F:\David\GIS_data\snap_template_data\VA_Buff50mi.shp'
+
+   # Current conservation lands
+   conslands_current = r'D:\biotics\bioticsdata_Sept2021.gdb\managed_areas'
 
    # process Conservation Lands
-   for year in ['2006', '2016']:
+   for year in ['2006', '2019', 'current']:
 
       # load and subset conservation lands
-      inPolys0 = os.path.join(out_dir, year, 'conslands' + year + '.shp')
-      inPolys = arcpy.MakeFeatureLayer_management(inPolys0,
-                                                  where_clause="BMI <> 'U'")  # U is excluded; rec'd by Dave Boyd
+      if year != 'current':
+         inPolys0 = os.path.join(out_dir, 'conslands' + year + '.shp')
+         nyear = year
+      else:
+         inPolys0 = conslands_current
+         nyear = '2019'
+      inPolys = arcpy.MakeFeatureLayer_management(inPolys0, where_clause="BMI <> 'U'")  # U is excluded; rec'd by Dave Boyd
+
       # LPS
-      outPolys = os.path.join(out_dir, year, 'conslands_lps_' + year + '.shp')
-      outRast = os.path.join(out_dir, year, 'conslands_lps_' + year + '.tif')
+      outPolys = 'conslands_lps_' + year + '_feat'
+      outRast = 'conslands_lps_' + year
       polyFlatten(inPolys, outPolys, "LPS", values=["4", "3", "2", "1"])
       arcpy.AddField_management(outPolys, "lpsint", "SHORT")
       arcpy.CalculateField_management(outPolys, "lpsint", "!LPS!", "PYTHON")
       arcpy.PolygonToRaster_conversion(outPolys, 'lpsint', 'lpsrast')
       arcpy.sa.Con(arcpy.sa.IsNull('lpsrast'), 5, 'lpsrast').save(outRast)  # LPS values are between 1-4
       # BMI
-      outPolys = os.path.join(out_dir, year, 'conslands_bmi_' + year + '.shp')
-      outRast = os.path.join(out_dir, year, 'conslands_bmi_' + year + '.tif')
+      outPolys = 'conslands_bmi_' + year + '_feat'
+      outRast = 'conslands_bmi_' + year
       polyFlatten(inPolys, outPolys, "BMI", values=["5", "4", "3", "2", "1"])
       arcpy.AddField_management(outPolys, "bmiint", "SHORT")
       arcpy.CalculateField_management(outPolys, "bmiint", "!BMI!", "PYTHON")
       arcpy.PolygonToRaster_conversion(outPolys, 'bmiint', 'bmirast')
       arcpy.sa.Con(arcpy.sa.IsNull('bmirast'), 6, 'bmirast').save(outRast)  # BMI values are between 1-5
 
-      # make a bmi/lps combination raster, used in the sampling mask.
-      bmi = os.path.join(out_dir, year, 'conslands_bmi_' + year + '.tif')
-      lps = os.path.join(out_dir, year, 'conslands_lps_' + year + '.tif')
-      arcpy.sa.Con(bmi, 1, 0, 'Value = 1').save('tmp_bmi')
-      arcpy.sa.Con(lps, 1, 0, 'Value = 1').save('tmp_lps')
-      arcpy.sa.Plus('tmp_bmi', 'tmp_lps').save('bmi1lps1_' + year)
+      # Create a distance to protected areas layer (to use as a model variable)
+      # Add PAD-US for non-VA Protected Lands
+      print(year)
+      with arcpy.EnvManager(extent=snap, mask=snap):
+         pad_query = "State_Nm <> 'VA' AND (Date_Est = ' ' OR CAST (Date_Est AS INT) <= " + year + ")"
+         pad_lyr = arcpy.MakeFeatureLayer_management(pad, where_clause=pad_query)
+         arcpy.SelectLayerByLocation_management(pad_lyr, 'INTERSECT', bnd)
+         arcpy.Merge_management([pad_lyr, inPolys], 'conslands_wPAD_' + year)
+         arcpy.sa.EucDistance('conslands_wPAD_' + year).save('conslands_edist_' + year)
+
+      # Protection multipliers
+      # deprecated: did not use
+      # Option 1: Protection multiplier, based on LPS and BMI)
+      # outRast = r'D:\git\ConsVision_DevVulnModel\inputs\masks\conslands_pmult_' + year + '.tif'
+      # protMult('conslands_bmi_' + year, 'conslands_lps_' + year, outRast)
+
+      # Option 2. BMI-only multiplier (based on BMI only)
+      outRast = r'D:\git\ConsVision_DevVulnModel\inputs\masks\conslands_pmultBMI_' + year + '.tif'
+      protMultBMI('conslands_bmi_' + year, outRast)
+
+   # clean up
+   arcpy.Delete_management(arcpy.ListFeatureClasses('tmp_*') + arcpy.ListRasters('tmp_*'))
 
 
 if __name__ == '__main__':

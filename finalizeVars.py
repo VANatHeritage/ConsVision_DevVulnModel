@@ -1,4 +1,4 @@
-'''
+"""
 finalizeVars.py
 Version: ArcGIS Pro
 Creation Date: 2021-09-07
@@ -6,13 +6,13 @@ Creator: David Bucklin
 
 This script finalizes all variables for the Development Vulnerability Model. This includes:
 - Clip/Mask to study area
-- If not already integer: multiply and convert to integer
+- If not already integer: apply multiplier and convert to integer
 - Output to TIF file
 
-Reads from an Excel File in the 'input/vars' folder.
-'''
+Reads from an Excel File in the 'input/vars' folder, which includes the columns:
+['varname', 'source_path', 'static', 'multiplier', 'use']
+"""
 
-import arcpy
 import numpy as np
 import pandas
 from Helper import *
@@ -31,7 +31,12 @@ def finalizeVar(in_rast, out_rast, mask, mult=100):
          arcpy.sa.Int(r * int(mult) + 0.5).save('tmp_rast')
       arcpy.sa.ExtractByMask('tmp_rast', mask).save(out_rast)
    else:
-      arcpy.sa.ExtractByMask(in_rast, mask).save(out_rast)
+      if mult == 1:
+         arcpy.sa.ExtractByMask(in_rast, mask).save(out_rast)
+      else:
+         print('Multiplying values...')
+         arcpy.sa.Int(r * int(mult)).save('tmp_rast')
+         arcpy.sa.ExtractByMask('tmp_rast', mask).save(out_rast)
    print('Created raster ' + out_rast + '.')
    return out_rast
 
@@ -39,17 +44,21 @@ def finalizeVar(in_rast, out_rast, mask, mult=100):
 def main():
 
    # Load variable table
-   vars_path = r'E:\git\ConsVision_DevVulnModel\inputs\vars\vars_MASTER.xlsx'
-   vars = pandas.read_excel(vars_path, usecols=['varname', 'source_path', 'multi_temporal', 'multiplier', 'use'])
-   # Years for multi-temporal variables (Only difference in paths between source rasters is the year).
-   years = ['2006', '2016']
+   vars_path = r'D:\git\ConsVision_DevVulnModel\inputs\vars\vars_DV.xlsx'
+   vars = pandas.read_excel(vars_path, usecols=['varname', 'source_path', 'static', 'multiplier', 'use'])
+   # Years for multi-temporal variables. In the excel file, the path uses the first year (2006). The only difference in
+   # paths between source rasters is the year, so a replace is used to get the path of the second year raster (2019).
+   years = ['2006', '2019']
 
    # Run and overwrite if files already exist? If False, only new variables will be created.
    over = False
 
    # Mask and snap raster
-   mask = r'E:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb\VA_ModelMask'
-   snap = r'E:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb\SnapRaster_albers_wgs84'
+   mask = r'D:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb\VA_ModelMask'
+   snap = r'D:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb\SnapRaster_albers_wgs84'
+
+   # Output folder (sub-folders for each processing year should be here)
+   out_folder = r'D:\git\ConsVision_DevVulnModel\inputs\vars'
 
    # Set environments
    arcpy.env.overwriteOutput = True
@@ -67,25 +76,24 @@ def main():
          continue
       nm = vars['varname'][i]
       mult = vars['multiplier'][i]
-      out_rast = r'E:\git\ConsVision_DevVulnModel\inputs\vars' + os.sep + years[0] + os.sep + nm + '.tif'
+      out_rast = out_folder + os.sep + years[0] + os.sep + nm + '.tif'
       if not arcpy.Exists(out_rast) or over:
          finalizeVar(in_rast, out_rast, mask, mult)
       else:
          print('Skipping, `' + out_rast + '` already exists.')
-      if vars['multi_temporal'][i] == 1:
-         # only difference for 2016 raster paths is the year in the path name. Replace them in the path and rerun.
+      if vars['static'][i] != 1:
+         # only difference for year[1] raster paths is the year in the path name. Replace them in the path and rerun.
          in_rast = in_rast.replace(years[0], years[1])
          if not arcpy.Exists(in_rast):
             print('Missing multi-temporal raster ' + in_rast + '.')
             continue
-         out_rast = r'E:\git\ConsVision_DevVulnModel\inputs\vars' + os.sep + years[1] + os.sep + nm + '.tif'
+         out_rast = out_folder + os.sep + years[1] + os.sep + nm + '.tif'
          if not arcpy.Exists(out_rast) or over:
             finalizeVar(in_rast, out_rast, mask, mult)
          else:
             print('Skipping, `' + out_rast + '` already exists.')
       else:
-         # copy the variable to the 2016 folder ?
-         # arcpy.Copy_management(out_rast, r'E:\git\ConsVision_DevVulnModel\inputs' + os.sep + years[1] + os.sep + nm + '.tif')
+         # static variable (only one time period)
          print('Static variable.')
 
 

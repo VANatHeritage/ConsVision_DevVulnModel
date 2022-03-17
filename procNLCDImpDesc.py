@@ -1,36 +1,31 @@
-# ---------------------------------------------------------------------------
-# procNLCDImpDesc.py
-# Version:  ArcGIS 10.3.1 / Python 2.7.8
-# Creator: David N. Bucklin
-# Creation Date: 2019-09-11
+"""
+procNLCDImpDesc.py
+Version:  ArcGIS Pro / Python 3.x
+Creator: David N. Bucklin
+Creation Date: 2019-09-11
 
-# Summary:
-# Used to create cost surfaces from NLCD's Impervious Descriptor raster dataset (released with NLCD 2016).
-# Both Limited access highways and local (all other roads) cost rasters are output.
-# Speeds are assigned in 'Remap' variable; alter this as needed.
+Summary:
+Used to process NLCD impervious descriptor for the vulnerabilty model. This includes creating a reclassified road raster
+assigning road speeds, and creating cost surfaces, where both Limited access highways and local (all other roads) cost
+rasters are output. Euclidean distance to each road type (local, ramp, and highway) are also generated, to use as
+predictor variables.
 
-# Tiger roads are used to define limited access highways and ramps. 2018 Tiger was used,
-# as this dataset was found to have the better LAH/ramp classification than older datasets (i.e. 2016).
-# This information is only used to reclassify the impervious descriptor dataset (it does not "create" roads).
-# This potentially could miss LAH/ramps from earlier time periods that are not in the same location
-# as the Tiger 2018 LAH/ramps.
+Tiger roads are used to define limited access highways and ramps. 2018 Tiger was used,
+as this dataset was found to have the better LAH/ramp classification than older datasets (i.e. 2016).
+This information is only used to reclassify the impervious descriptor dataset (it does not "create" roads).
+This potentially could miss LAH/ramps from earlier time periods that are not in the same location
+as the Tiger 2018 LAH/ramps.
 
-# These cost rasters can be used with the ServiceAreas toolset (https://github.com/VANatHeritage/ServiceAreas).
+These cost rasters can be used with the ServiceAreas toolset (https://github.com/VANatHeritage/ServiceAreas).
 
-# FIXME: Tunnels are not represented in this dataset (they are not surface roads).
-#  SOLUTION: Major tunnels were manually digitized and are burned in to the dataset (see 'burnin_tunnels' feature class)
-# ---------------------------------------------------------------------------
-
-# Import Helper module and functions
+FIXME: Tunnels are not represented in this dataset (they are not surface roads).
+ Fixed: Major tunnels were manually digitized and are burned in to the dataset (see 'burnin_tunnels' feature class)
+"""
 from Helper import *
 
 
 def ImpDesc_CostSurf(impDesc, urbanAreas, out_gdb, lah, ramps, ramp_pts, burn_tunnels=None):
-   # working: this works, but not sure if want to use. Another option would be to use Impervious Descriptor to adjust a
-   #  current roads dataset (vector), assigning those not existing in previous time period to be excluded.
-   #  Any other options???
 
-   # reclassify to 1-6 values
    print("Reclassifying impervious descriptor roads...")
    remap0 = RemapValue([[20, 2], [21, 4], [22, 6]])  # These are primary/secondary/tertiary roads.
    arcpy.sa.Reclassify(impDesc, "Value", remap0, "NODATA").save("tmp_imp0")
@@ -46,27 +41,23 @@ def ImpDesc_CostSurf(impDesc, urbanAreas, out_gdb, lah, ramps, ramp_pts, burn_tu
    imp = 'imp_rcl'
    if burn_tunnels is not None:
       print('Burning in tunnels...')
-      arcpy.PolylineToRaster_conversion(burn_tunnels, 'rast', 'tmp_tunnels', cellsize='tmp_imp1')
-      arcpy.sa.CellStatistics(['tmp_imp1', 'tmp_tunnels'], 'MAXIMUM').save('tmp_imp2')
+      arcpy.PolylineToRaster_conversion(burn_tunnels, 'rast', 'tmp_tunnels')
+      # set tunnel pixel values into roads raster
+      arcpy.sa.Con(arcpy.sa.IsNull('tmp_tunnels'), 'tmp_imp1', 'tmp_tunnels', "VALUE = 1").save('tmp_imp2')
       arcpy.sa.Minus('tmp_imp2', 'tmp_ua_rast').save(imp)
    else:
       arcpy.sa.Minus('tmp_imp1', 'tmp_ua_rast').save(imp)
 
-   print('Making euclidean distance to roads layer (allRoads_dist)...')
-   arcpy.sa.SetNull(imp, 1, 'Value < 1').save('tmp_allrd')
-   arcpy.sa.EucDistance('tmp_allrd').save('allRoads_dist')
-
    print('Processing limited-access highways...')
-   # process limited access roads/ramps for reclassifying roads in impervious descriptor
    arcpy.PairwiseBuffer_analysis(lah, 'tmp_rd_bufflah', 45, dissolve_option="ALL")
    # set LAH areas for Primary/Secondary roads to value of 100 (Tertiary road class ignored for LAH)
    arcpy.sa.ExtractByMask(imp, 'tmp_rd_bufflah').save('tmp_lah2')
    arcpy.sa.Reclassify('tmp_lah2', "Value", RemapRange([[-10, 0, 0], [0.5, 4.5, 100], [4.5, 126, 0]])).save('tmp_lah_raster')
 
-   # only take ramps that intersect LAH
    print('Processing ramps...')
    arcpy.PairwiseBuffer_analysis(ramps, 'tmp_rd_buffrmp', 45, dissolve_option="ALL")
    arcpy.MultipartToSinglepart_management('tmp_rd_buffrmp', 'tmp_rd_buffrmp1')
+   # only take ramps that intersect LAH
    rmp_lyr = arcpy.MakeFeatureLayer_management('tmp_rd_buffrmp1')
    arcpy.SelectLayerByLocation_management(rmp_lyr, "INTERSECT", "tmp_rd_bufflah", "#", "NEW_SELECTION")
    # set all ramp road areas to value of 10 (ramps can be any road class)
@@ -75,10 +66,10 @@ def ImpDesc_CostSurf(impDesc, urbanAreas, out_gdb, lah, ramps, ramp_pts, burn_tu
 
    print('Adding LAH (+100) and RMP (+10) indicators to reclassified impervious descriptor...')
    arcpy.sa.CellStatistics(['tmp_lah_raster', 'tmp_rmp_raster'], "MAXIMUM", "DATA").save('tmp_lah_rmp')
-   arcpy.sa.CellStatistics([imp, 'tmp_lah_rmp'], "SUM", "DATA").save('tmp_imprcl')
+   arcpy.sa.CellStatistics([imp, 'tmp_lah_rmp'], "SUM", "DATA").save('all_roads_reclass')
 
    # now set NULL LAH areas (ramps will get included in both local/LAH rasters)
-   arcpy.sa.SetNull('tmp_imprcl', 'tmp_imprcl', 'Value > 100').save('tmp_imprcl_nolah')
+   arcpy.sa.SetNull('all_roads_reclass', 'all_roads_reclass', 'Value > 100').save('tmp_imprcl_nolah')
    print('Reclassifying to MPH...')
    # reclassify values to MPH
    speed_remap = RemapValue([[-1, 3], [0, 3],  # background
@@ -95,7 +86,7 @@ def ImpDesc_CostSurf(impDesc, urbanAreas, out_gdb, lah, ramps, ramp_pts, burn_tu
    arcpy.sa.CellStatistics(['tmp_mph_local1', 'tmp_mph_local2'], "MAXIMUM", "DATA").save('local_mph')
    (0.037 / Raster('local_mph')).save('local_cost')
    # now output an LAH-only raster (ramps included)
-   arcpy.sa.SetNull('tmp_imprcl', 'tmp_imprcl',
+   arcpy.sa.SetNull('all_roads_reclass', 'all_roads_reclass',
                     'Value NOT IN (11,12,13,14,15,16,101,102,103,104)').save('tmp_imprcl_lah')
    arcpy.sa.Reclassify('tmp_imprcl_lah', 'Value', speed_remap).save('lah_mph')
    (0.037 / Raster('lah_mph')).save('lah_cost')
@@ -121,41 +112,64 @@ def ImpDesc_CostSurf(impDesc, urbanAreas, out_gdb, lah, ramps, ramp_pts, burn_tu
    return out_gdb
 
 
-# Tiger/Line roads (only LAH and ramps are used from this dataset, for reclassifying those roads)
-road = r'L:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_centerline'
-lah = arcpy.MakeFeatureLayer_management(road, where_clause="MTFCC IN ('S1100')")
-ramp = arcpy.MakeFeatureLayer_management(road, where_clause="MTFCC IN ('S1630')")
-ramp_pts = r'L:\David\projects\RCL_processing\Tiger_2018\cost_surfaces.gdb\rmpt_final'
-# burn in tunnels feature class
-burn = r'L:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\burnin_tunnels'
+def main():
 
-# OSM
-# lah_rmp = r'E:\projects\OSM\network\OSM_RoadsNet_Albers.gdb\Roads_Hwy'
-# lah = arcpy.MakeFeatureLayer_management(lah_rmp, where_clause="code = 5111")
-# ramp = arcpy.MakeFeatureLayer_management(lah_rmp, where_clause="code = 5131")
-# ramp_pts = r'E:\projects\OSM\network\OSM_RoadsNet_Albers.gdb\ramp_points'
+   # Year to process
+   nlcd_year = '2006'
 
-# Impervious descriptor
-impDesc = r'L:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_Impervious_albers.gdb\impDescriptor_2016'
-# urban areas
-urbanAreas = r'L:\David\GIS_data\US_CENSUS_TIGER\UrbanAreas\tl_2016_us_uac10\tl_2016_us_uac10.shp'
+   # NOTE: Adjust TIGER to use based on nlcd_year (TIGER should be from a later date)
+   # Tiger/Line roads (only LAH and ramps are used from this dataset, for reclassifying those roads. Need to make
+   # sure that dataset used is from year AFTER the nlcd_year.
+   if nlcd_year == '2006':
+      road = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_centerline'
+   else:
+      road = r'F:\David\projects\RCL_processing\Tiger_2020\roads_proc.gdb\all_centerline'
+   # Get road subset layers from Tiger
+   lah = arcpy.MakeFeatureLayer_management(road, where_clause="MTFCC IN ('S1100')")
+   ramps = arcpy.MakeFeatureLayer_management(road, where_clause="MTFCC IN ('S1630')")
+   ramp_pts = r'F:\David\projects\RCL_processing\Tiger_2020\cost_surfaces.gdb\rmpt_final'
 
-# workspace (will be created if not existing)
-out_gdb = r'L:\David\projects\vulnerability_model\vars\nlcd_based\cost_surfaces\costSurface_2016.gdb'
-make_gdb(out_gdb)
-arcpy.env.workspace = out_gdb
+   # burn in tunnels feature class (FIXED to Tiger_2018)
+   burn_tunnels = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\burnin_tunnels'
 
-# Environment settings
-snap = impDesc
-arcpy.env.mask = snap
-arcpy.env.extent = snap
-arcpy.env.cellSize = snap
-arcpy.env.snapRaster = snap
-arcpy.env.outputCoordinateSystem = snap
-arcpy.env.overwriteOutput = True
+   # OSM (not using)
+   # lah_rmp = r'D:\projects\OSM\network\OSM_RoadsNet_Albers.gdb\Roads_Hwy'
+   # lah = arcpy.MakeFeatureLayer_management(lah_rmp, where_clause="code = 5111")
+   # ramp = arcpy.MakeFeatureLayer_management(lah_rmp, where_clause="code = 5131")
+   # ramp_pts = r'D:\projects\OSM\network\OSM_RoadsNet_Albers.gdb\ramp_points'
 
-# Create cost surfaces
-ImpDesc_CostSurf(impDesc, urbanAreas, out_gdb, lah, ramp, ramp_pts, burn)
+   # Impervious descriptor
+   impDesc = r'F:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_Impervious_albers.gdb\impDescriptor_' + nlcd_year
+   # urban areas
+   urbanAreas = r'F:\David\GIS_data\US_CENSUS_TIGER\UrbanAreas\tl_2016_us_uac10\tl_2016_us_uac10.shp'
 
+   # workspace (will be created if not existing)
+   out_gdb = r'C:\David\proc\costSurface_' + nlcd_year + '.gdb'  # copy to: r'F:\David\projects\vulnerability_model\vars\nlcd_based\cost_surfaces\costSurface_' + nlcd_year + '.gdb'
+   make_gdb(out_gdb)
+   arcpy.env.workspace = out_gdb
 
-# end
+   # Environment settings
+   snap = impDesc
+   arcpy.env.mask = snap
+   arcpy.env.extent = snap
+   arcpy.env.cellSize = snap
+   arcpy.env.snapRaster = snap
+   arcpy.env.outputCoordinateSystem = snap
+   arcpy.env.overwriteOutput = True
+
+   # Create cost surfaces
+   ImpDesc_CostSurf(impDesc, urbanAreas, out_gdb, lah, ramps, ramp_pts, burn_tunnels)
+
+   # Road euclidean distance variables
+   print('Calculating euclidean distance for different road types...')
+   arcpy.sa.SetNull('all_roads_reclass', 1, 'Value NOT IN (1,2,3,4,5,6)').save('tmp_ed')
+   arcpy.sa.EucDistance("tmp_ed").save('local_edist')
+   arcpy.sa.SetNull('all_roads_reclass', 1, 'Value NOT IN (11,12,13,14,15,16)').save('tmp_ed')
+   arcpy.sa.EucDistance("tmp_ed").save('ramp_edist')
+   arcpy.sa.SetNull('all_roads_reclass', 1, 'Value NOT IN (101,102,103,104)').save('tmp_ed')
+   arcpy.sa.EucDistance("tmp_ed").save('lah_edist')
+   # Create pyramids
+   arcpy.BuildPyramidsandStatistics_management(out_gdb)
+
+if __name__ == '__main__':
+   main()

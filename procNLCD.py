@@ -1,20 +1,18 @@
-# ----------------------------------------------------------------------------------------
-# procNLCD.py
-# Version:  ArcGIS 10.3.1 / Python 2.7.8 (compatible with Pro also)
-# Creation Date: 2019-09-05
-# Last Edit: 2020-01-09
-# Creator:  Kirsten R. Hazler / David Bucklin
+"""
+procNLCD.py
+Version:  ArcGIS Pro
+Creation Date: 2019-09-05
+Last Edit: 2020-01-09
+Creator:  Kirsten R. Hazler / David Bucklin
 
-# Summary:
-# A library of functions for processing National Land Cover Database data
-#
-# Usage Notes:
-# 'year' is a standard variable that functions as a suffix for the file(s) to create. Use the full year (e.g. 2006)
-# here for single-year variables, and for multi-year variables, use the last 2 digits of the two years separated by '_'
-# (e.g. 06_16 for 2006/2016).
-# ----------------------------------------------------------------------------------------
+Summary:
+A library of functions for processing National Land Cover Database data
 
-# Import modules and functions
+Usage Notes:
+'year' is a standard variable that functions as a suffix for the file(s) to create. Use the full year (e.g. 2006)
+here for single-year variables, and for multi-year variables, use the last 2 digits of the two years separated by '_'
+(e.g. 06_16 for 2006/2016).
+"""
 from Helper import *
 
 
@@ -83,49 +81,115 @@ def MakeKernelList(out_Dir):
    Parameters:
    - out_Dir: directory in which output text files will be saved.
    '''
-   f1 = out_Dir + os.sep + 'k100_025_10.txt'
-   f2 = out_Dir + os.sep + 'k100_050_10.txt'
-   f3 = out_Dir + os.sep + 'k100_100_10.txt'
-   f4 = out_Dir + os.sep + 'k100_150_10.txt'
-   f5 = out_Dir + os.sep + 'k100_200_10.txt'
+   f1 = out_Dir + os.sep + 'wk30_025_3.txt'
+   f2 = out_Dir + os.sep + 'wk30_050_3.txt'
+   f3 = out_Dir + os.sep + 'wk30_100_3.txt'
+   f4 = out_Dir + os.sep + 'wk10_025_1.txt'
+   f5 = out_Dir + os.sep + 'wk10_050_1.txt'
+   f6 = out_Dir + os.sep + 'wk10_100_1.txt'
 
-   p1 = [f1, 100, 0.25, 100, 3, 0, 0, 10]
-   p2 = [f2, 100, 0.50, 100, 3, 0, 0, 10]
-   p3 = [f3, 100, 1.00, 100, 3, 0, 0, 10]
-   p4 = [f4, 100, 1.50, 100, 3, 0, 0, 10]
-   p5 = [f5, 100, 2.00, 100, 3, 0, 0, 10]
+   p1 = [f1, 30, 0.25, 100, 3, 0, 0, 3]
+   p2 = [f2, 30, 0.50, 100, 3, 0, 0, 3]
+   p3 = [f3, 30, 1.00, 100, 3, 0, 0, 3]
+   p4 = [f4, 10, 0.25, 100, 3, 0, 0, 1]
+   p5 = [f5, 10, 0.50, 100, 3, 0, 0, 1]
+   p6 = [f6, 10, 1.00, 100, 3, 0, 0, 1]
 
-   parmsList = [p1, p2, p3, p4, p5]
+   parmsList = [p1, p2, p3, p4, p5, p6]
    return parmsList
 
 
 def MultiWeightKernels(parmsList):
    '''Creates multiple weighted neighborhood kernels using the MakeWeightKernel function, using a list of parameter sets.
    Parameters:
-   - parmsList: A list of parameter lists. Each parameter list must contain the set of parameters in order required by the MakeWeightKernel function
+   - parmsList: A list of parameter lists. Each parameter list must contain the set of parameters in order required
+      by the MakeWeightKernel function
+   Returns a list with [NbrWeight object, Text file basename], which can be used for the 'neighborhoods' argument
+      in the ImpFocal function.
    '''
+   outList = []
    for p in parmsList:
       out_File = p[0]
+      print(out_File)
       nCells = p[1]
       gamma = p[2]
       scale = p[3]
       rounding = p[4]
       ysnInt = p[5]
       centerVal = p[6]
-      MakeWeightKernel(out_File, nCells, gamma, scale, rounding, ysnInt, centerVal)
-   return
+      annDist = p[7]
+
+      MakeWeightKernel(out_File, nCells, gamma, scale, rounding, ysnInt, centerVal, annDist)
+      out = [arcpy.sa.NbrWeight(out_File), os.path.basename(out_File).replace('.txt', '')]
+      outList.append(out)
+
+   return outList
 
 
 def ImpFocal(imperv, neighborhoods, year, stat="MEAN"):
 
+   print('Setting value = 127 to NoData...')
+   arcpy.sa.SetNull(imperv, imperv, 'Value = 127').save('tmp_imp')
    ls = []
    for n in neighborhoods:
-      out = n[1] + '_' + year
+      out = n[1] + '_imp_' + year
       print('Creating `' + out + '`...')
-      arcpy.sa.FocalStatistics(imperv, n[0], stat).save(out)
+      arcpy.sa.FocalStatistics('tmp_imp', n[0], stat).save(out)
       ls.append(out)
 
    return ls
+
+
+def LCFocal(lc, classes, neighborhoods, year, stat="MEAN"):
+
+   q = ','.join([str(i) for i in classes[0]])
+   print('Creating binary raster')
+   arcpy.sa.Con(lc, 1, 0, 'Value IN (' + q + ')').save('tmp_lc')
+   ls = []
+   for n in neighborhoods:
+      out = n[1] + '_' + classes[1] + '_' + year
+      if arcpy.Exists(out):
+         print('skipping, already exists')
+         continue
+      print('Creating `' + out + '`...')
+      arcpy.sa.FocalStatistics('tmp_lc', n[0], stat).save(out)
+      ls.append(out)
+   return ls
+
+
+def NewRoadDist(t1, t2, year, keep_intermediate=False):
+   """Generate Impervious area growth spots, based on two time periods from NLCD.
+   Parameters:
+   - t1: Impervious descriptor raster in time 1
+   - t2: Impervious descriptor raster in time 2
+   - year: Year suffix added to output dataset
+   - keep_intermediate: Whether intermediate rasters should be saved (True), or deleted (False)
+   - edist: Whether to run Euclidean distance on the hotspots output. (file will have '_edist' suffix)
+   """
+
+   # set up naming scheme
+   nm = 'newRoad'
+
+   # Create difference raster
+   print('Generating binary road rasters...')
+   arcpy.sa.Con(t1, 1, 0, 'Value IN (20, 21, 22, 23)').save('T1')
+   arcpy.sa.Con(t2, 1, 0, 'Value IN (20, 21, 22, 23)').save('T2')
+   print('Generating new road raster `' + nm + '`...')
+   arcpy.sa.Minus('T2', 'T1').save('tmp_minus')
+   arcpy.sa.SetNull('tmp_minus', 1, 'Value <> 1').save(nm + '_' + year)
+
+   print('Calculating euclidean distance...')
+   arcpy.sa.EucDistance(nm + '_' + year).save('tmp_ed')
+   arcpy.sa.Int(arcpy.sa.Raster('tmp_ed') + 0.5).save(nm + '_edist_' + year)
+   arcpy.BuildPyramids_management(nm + '_edist_' + year)
+
+   # clean up
+   arcpy.Delete_management(['tmp_minus', 'tmp_ed'])
+   # delete intermediate
+   if not keep_intermediate:
+      arcpy.Delete_management(['T1', 'T2'])
+
+   return nm
 
 
 def ImpGrowthSpots(t1, t2, year, cutoff=20, areamin=20000, keep_intermediate=False, edist=False):
@@ -159,7 +223,7 @@ def ImpGrowthSpots(t1, t2, year, cutoff=20, areamin=20000, keep_intermediate=Fal
    arcpy.sa.Con('FDiff_' + nm, 1, None, 'Value >= ' + str(cutoff)).save('Pot_' + nm)
    arcpy.sa.RegionGroup('Pot_' + nm, 'EIGHT', 'WITHIN').save('Regions_' + nm)
 
-   # Calculate areas of regions, remove those smaller than threshold
+   print('Calculating areas of regions, removing those smaller than threshold...')
    arcpy.sa.ZonalGeometry('Regions_' + nm, 'VALUE', 'AREA').save('Area_' + nm)
    arcpy.sa.Con('Area_' + nm, 1, None, 'Value >= ' + str(areamin)).save(nm)
    arcpy.BuildPyramids_management(nm)
@@ -175,49 +239,6 @@ def ImpGrowthSpots(t1, t2, year, cutoff=20, areamin=20000, keep_intermediate=Fal
    if not keep_intermediate:
       ls = ['Diff_', 'FDiff_', 'Pot_', 'Regions_', 'Area_']
       ls = [s + nm for s in ls]
-      arcpy.Delete_management(ls)
-
-   return nm
-
-
-def DevChg(t1, t2, year, develmin=1, keep_intermediate=False):
-   """Generate development change raster, based on impervious surface percentage from two time periods from NLCD.
-   0 = not developed in either time period;
-   1 = went from undeveloped to developed;
-   2 = developed both time periods;
-   3 = went from developed to undeveloped (rare)
-   Parameters:
-   - t1: Impervious raster in time 1
-   - t2: Impervious raster in time 2
-   - develmin = The minimum imperviousness (in percent), for a cell to be considered developed
-   - keep_intermediate: Whether intermediate rasters should be saved (True), or deleted (False)
-   """
-
-   # set up naming scheme
-   suf = 'min' + '{:02d}'.format(develmin)
-   nm = 'DevChg_' + suf + '_' + year
-   # Create difference raster
-
-   # make binary rasters
-   r1 = os.path.basename(t1) + '_DevStat' + suf
-   r2 = os.path.basename(t2) + '_DevStat' + suf
-
-   print('Generating development status rasters...')
-   remap = RemapRange([[0, develmin - 0.1, 0], [develmin - 0.1, 100.1, 1]])
-   arcpy.sa.Reclassify(t1, "Value", remap, missing_values="NODATA").save(r1)
-   remap = RemapRange([[0, develmin - 0.1, 0], [develmin - 0.1, 100.1, 1]])
-   arcpy.sa.Reclassify(t2, "Value", remap, missing_values="NODATA").save(r2)
-
-   print('Generating impervious change raster `' + nm + '`...')
-   rchg = Raster(r1) + (Raster(r2) * 100)
-   remap = RemapValue([[0, 0], [1, 3], [100, 1], [101, 2]])
-   arcpy.sa.Reclassify(rchg, 'Value', remap, missing_values="NODATA").save(nm)
-   arcpy.BuildPyramids_management(nm)
-
-   arcpy.Delete_management(rchg)
-   # delete intermediate
-   if not keep_intermediate:
-      ls = [r1, r2]
       arcpy.Delete_management(ls)
 
    return nm
@@ -254,32 +275,33 @@ def EucDistNLCD(nlcd, classes, year, maxDist=None):
 
 def CostNLCD(nlcd, year):
 
-   out = 'lc_cost_' + year
+   out = 'lc_cost_'
    print('Making land cover cost raster `' + out + '`.')
 
    # Assign costs to remap value
    rcl = arcpy.sa.RemapValue([[11, 5], [21, 0], [22, 0], [23, 0], [24, 0], [31, 1], [41, 4], [42, 4], [43, 4],
-                              [52, 3], [72, 2], [81, 2], [82, 2], [90, 4], [95, 2]])
-   arcpy.sa.Reclassify(nlcd, 'Value', rcl, "NODATA").save(out)
-   # coulddo: arcpy.sa.FocalStatistics(out, [])
+                              [52, 3], [71, 2], [81, 2], [82, 2], [90, 4], [95, 2]])
+   arcpy.sa.Reclassify(nlcd, 'Value', rcl, "NODATA").save(out + year)
+   print('Calculating focal statistic in 3-cell circle...')
+   arcpy.sa.FocalStatistics(out, NbrCircle(3, "CELL"), "MEAN").save(out + '3cell_' + year)
    return out
-
 
 
 def main():
 
+   # HEADER
 
    # Input geodatabases
-   nlcd_gdb = r'L:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_LandCover_albers.gdb'
-   imp_gdb = r'L:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_Impervious_albers.gdb'
+   nlcd_gdb = r'F:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_LandCover_albers.gdb'
+   imp_gdb = r'F:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_Impervious_albers.gdb'
 
    # Outputs
-   out_folder = r'L:\David\projects\vulnerability_model\vars\nlcd_based'
+   out_folder = r'F:\David\projects\vulnerability_model\vars\nlcd_based'
    out_gdb = out_folder + os.sep + 'nlcdv19_variables.gdb'
-   templ = nlcd_gdb + os.sep + 'lc_2019'
    make_gdb(out_gdb)
 
    # Set environments
+   templ = nlcd_gdb + os.sep + 'lc_2019'
    arcpy.env.workspace = out_gdb
    arcpy.env.extent = templ
    arcpy.env.mask = templ
@@ -287,33 +309,60 @@ def main():
    arcpy.env.outputCoordinateSystem = templ
    arcpy.env.snapRaster = templ
 
-   # Target NLCD years
-   years = ['2006', '2016']
+   # Target NLCD year(s)
+   years = ['2006', '2019']
+
+   # END HEADER
 
    # Impervious in neighborhood
-   # TODO: implement alternative kernels?
-   # kl = MakeKernelList(out_folder)
-   # MultiWeightKernels(kl)
+   # coulddo: implement alternative kernels?
+   kl = MakeKernelList(out_folder + os.sep + 'kernels')
+   ngh = MultiWeightKernels(kl)
+
+   for y in years:
+      imp = imp_gdb + os.sep + 'imperv_' + y
+      # Note that large-radius kernels can take a very long time to process.
+      ImpFocal(imp, ngh, y)
 
    # Standard kernels
-   neighborhoods = [[NbrAnnulus(1, 10), 'imp_ann1_10'], [NbrAnnulus(10, 20), 'imp_ann10_20'],
-                    [NbrAnnulus(20, 30), 'imp_ann20_30'], [NbrAnnulus(30, 40), 'imp_ann30_40'],
-                    [NbrAnnulus(40, 50), 'imp_ann40_50'],
-                    [NbrIrregular(r'L:\David\projects\vulnerability_model\vars\nlcd_based\krect_3x3.txt'), 'imp_kRect3']]
+   # Did not use Annulus:
+      # [NbrAnnulus(1, 10), 'imp_ann1_10'], [NbrAnnulus(10, 20), 'imp_ann10_20'], [NbrAnnulus(20, 30), 'imp_ann20_30'],
+      # [NbrAnnulus(30, 40), 'imp_ann30_40'], [NbrAnnulus(40, 50), 'imp_ann40_50']
+   neighborhoods = [[NbrIrregular(r'F:\David\projects\vulnerability_model\vars\nlcd_based\kernels\krect_3x3.txt'), 'kRect3']]
    for y in years:
       imp = imp_gdb + os.sep + 'imperv_' + y
       ImpFocal(imp, neighborhoods, y)
 
+   # Focal land cover
+   kl = MakeKernelList(out_folder + os.sep + 'kernels')
+   ngh = MultiWeightKernels(kl)
+   ind = [1, 4]  # only want the 0.5-gamma kernels
+   ngh = [ngh[i] for i in ind]  # subset
+   classes = [[['90', '95'], 'wetland'], [['11'], 'openwater']]
+   for y in years:
+      nlcd = nlcd_gdb + os.sep + 'lc_' + y
+      for cl in classes:
+         LCFocal(nlcd, cl, ngh, y, 'MEAN')
+
    # Euclidean distance to NLCD classes
    for y in years:
       nlcd = nlcd_gdb + os.sep + 'lc_' + y
-      classes = [[[11], 'openwater'], [[90, 95], 'wetland'], [[41, 42, 43], 'forest']]
-      # out = r'L:\David\projects\vulnerability_model\edist_nlcd\edist_' + y + '.gdb'
+      classes = [[[11], 'openwater'], [[90, 95], 'wetland']]  # [[41, 42, 43], 'forest']]
       EucDistNLCD(nlcd, classes, y)
+
+
+
+   # Land cover cost
+   for y in years:
+      nlcd = nlcd_gdb + os.sep + 'lc_' + y
+      CostNLCD(nlcd, y)
+
+
+   ### Multiple-year (change) variables
 
    # Impervious hot spots
    tps = [[imp_gdb + os.sep + 'imperv_2001', imp_gdb + os.sep + 'imperv_2006'],
-          [imp_gdb + os.sep + 'imperv_2011', imp_gdb + os.sep + 'imperv_2016']]
+          [imp_gdb + os.sep + 'imperv_2013', imp_gdb + os.sep + 'imperv_2019']]
    for tp in tps:
       t1 = tp[0]
       t2 = tp[1]
@@ -322,19 +371,14 @@ def main():
       for i in reps:
          ImpGrowthSpots(t1, t2, y, i[0], i[1], edist=True)
 
-   # Land cover cost
-   for y in years:
-      nlcd = nlcd_gdb + os.sep + 'lc_' + y
-      CostNLCD(nlcd, y)
-
-   # Development change
-   tps = [[imp_gdb + os.sep + 'imperv_2006', imp_gdb + os.sep + 'imperv_2016'],
-          [imp_gdb + os.sep + 'imperv_2016', imp_gdb + os.sep + 'imperv_2019']]
+   # New road euclidean distance
+   tps = [[imp_gdb + os.sep + 'impDescriptor_2001', imp_gdb + os.sep + 'impDescriptor_2006'],
+          [imp_gdb + os.sep + 'impDescriptor_2013', imp_gdb + os.sep + 'impDescriptor_2019']]
    for tp in tps:
       t1 = tp[0]
       t2 = tp[1]
-      y = t1[-2:] + '_' + t2[-2:]
-      DevChg(t1, t2, y, develmin=1, keep_intermediate=False)
+      y = t2[-4:]  # naming scheme (uses last year of sequence)
+      NewRoadDist(t1, t2, y)
 
 
 if __name__ == '__main__':

@@ -8,4 +8,6 @@
 *.Rproj
 # ArcGIS project folder
 ArcGIS/
-recycling.py
+recycling/
+# folders
+ref
