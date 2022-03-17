@@ -15,6 +15,7 @@ import os
 import sys
 import traceback
 import numpy
+import regex as re
 from datetime import datetime as datetime
 
 try:

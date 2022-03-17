@@ -40,7 +40,7 @@ def main():
    # Input features
    if yr == '2006':
       accFeat0 = r'F:\David\projects\vulnerability_model\vars\travel_time\UrbanCores2000\UrbanCores2000.shp'  # T1
-   else:
+   elif yr == "2019":
       accFeat0 = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\UrbanCores2010_method3'  # T2
    # Output geodatabase
    outGDB = r'C:\David\proc\urbanCores' + yr + '_travelTime.gdb'

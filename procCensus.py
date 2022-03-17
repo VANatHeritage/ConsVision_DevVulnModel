@@ -26,7 +26,7 @@ TODO: Linear blocks around roads are not meeting shape index criteria in many ca
 from Helper import *
 
 
-def PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Year):  # in_Imperv20, out_Tracts):
+def PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Year, out_Tracts=None):
    '''Prepares Block-level and Tract-level data from the Census for the MakeUrbanCores function. Assumes GIS and
    tabular data for census blocks have been downloaded from https://www.nhgis.org/.
    
@@ -44,10 +44,11 @@ def PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Year):  # in_Imperv20, out_Tr
    - in_Blocks: Input feature class representing Census blocks
    - in_PopTab: Input table containing population count for each block
    - in_Imperv: Input raster representing percent imperviousness
-   - REMOVED (generated in-function): in_Imperv20: Input raster in which cells with 20% or greater imperviousness are set to 1, otherwise 0
-   - REMOVED (not output): out_Tracts: Output feature class representing Census tracts
    - in_Year: The census year of the data
+   - out_Tracts: (optional) Output feature class representing Census tracts
+   - REMOVED (now generated in-function): in_Imperv20: Input raster in which cells with 20% or greater imperviousness are set to 1, otherwise 0
    '''
+   scratchGDB = arcpy.env.scratchGDB
 
    # Existing field names in blocks feature class
    bnames = [f.name for f in arcpy.ListFields(in_Blocks)]
@@ -117,31 +118,33 @@ def PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Year):  # in_Imperv20, out_Tr
    # Calculate the proportion of polygon covered by 20% or greater imperviousness
    if 'IMPERV20_MEAN' not in bnames:
       printMsg('Calculating proportion with 20% or greater imperviousness...')
-      in_Imperv20 = 'tmp_imp20'
-      with arcpy.EnvManager(extent=in_Blocks):
-         arcpy.sa.SetNull(in_Imperv, 1, 'Value >= 20').save(in_Imperv20)
+      in_Imperv20 = scratchGDB + os.sep + 'tmp_imp20'
+      with arcpy.EnvManager(extent=in_Blocks, cellSize=in_Imperv, snapRaster=in_Imperv,
+                            outputCoordinateSystem=in_Imperv):
+         arcpy.sa.Con(in_Imperv, 1, 0, 'Value >= 20 AND Value <= 100').save(in_Imperv20)
       zTab20 = in_Blocks + '_Imperv20'
       ZonalStatisticsAsTable(in_Blocks, 'GISJOIN', in_Imperv20, zTab20, "DATA", "MEAN")
       arcpy.JoinField_management(in_Blocks, 'GISJOIN', zTab20, 'GISJOIN', ['MEAN'])
       arcpy.AlterField_management(in_Blocks, 'MEAN', 'IMPERV20_MEAN')
 
-   # # Dissolve blocks to get tracts. Aggregate to get sums of population and area.
-   # # Keep multi-parts, because some tracts get split by water but should be counted as a single unit
-   # printMsg('Dissolving blocks to create tracts...')
-   # arcpy.Dissolve_management(in_Blocks, out_Tracts, "TRACT_ID", "POP SUM;AREA_SQMI SUM", "MULTI_PART")
-   # arcpy.AlterField_management(out_Tracts, "SUM_POP", "POP")
-   # arcpy.AlterField_management(out_Tracts, "SUM_AREA_SQMI", "AREA_SQMI")
+   # Dissolve blocks to get tracts. Aggregate to get sums of population and area.
+   # Keep multi-parts, because some tracts get split by water but should be counted as a single unit
+   if out_Tracts:
+      printMsg('Dissolving blocks to create tracts...')
+      arcpy.Dissolve_management(in_Blocks, out_Tracts, "TRACT_ID", "POP SUM;AREA_SQMI SUM", "MULTI_PART")
+      arcpy.AlterField_management(out_Tracts, "SUM_POP", "POP")
+      arcpy.AlterField_management(out_Tracts, "SUM_AREA_SQMI", "AREA_SQMI")
 
-   # # Calculate the population density in persons per square mile, for the tracts
-   # printMsg('Calculating tract population density...')
-   # arcpy.AddField_management(out_Tracts, "DENS_PPSM", "DOUBLE")
-   # expression = "!POP! / !AREA_SQMI!"
-   # arcpy.CalculateField_management(out_Tracts, "DENS_PPSM", expression, "PYTHON_9.3") 
+      # Calculate the population density in persons per square mile, for the tracts
+      printMsg('Calculating tract population density...')
+      arcpy.AddField_management(out_Tracts, "DENS_PPSM", "DOUBLE")
+      expression = "!POP! / !AREA_SQMI!"
+      arcpy.CalculateField_management(out_Tracts, "DENS_PPSM", expression, "PYTHON_9.3")
 
-   # printMsg('Finished prepping blocks and tracts.')
-   # return (in_Blocks, out_Tracts)
-
-   return in_Blocks
+      printMsg('Finished prepping blocks and tracts.')
+      return (in_Blocks, out_Tracts)
+   else:
+      return in_Blocks
 
 
 def MakeUrbanCores(in_Blocks, out_Cores):
@@ -275,15 +278,14 @@ def CategorizeCores(in_Cores):
 
 ### Use the main function below to run desired function(s) directly from Python IDE or command line with hard-coded variables
 def main():
-   out_gdb = r'F:\David\projects\vulnerability_model\vars\travel_time\urban_cores.gdb'
-   make_gdb(out_gdb)
 
-   # # Set up variables
+   # Kirstens's code (updated by DB to reflect argument changes to PrepBlocks).
+   # Set up variables
    # in_Blocks = r'C:\Users\xch43889\Documents\Working\ConsVision\VulnMod\CensusWork2000.gdb\CensusBlocks2000_70mi'
    # # blocks subset to an additional 20 miles around the processing buffer, i.e., 70 miles around Virginia.
    # in_PopTab = r'C:\Users\xch43889\Documents\Working\ConsVision\VulnMod\CensusWork2000.gdb\CensusBlocks2000_Pop'
    # in_Imperv = r'D:\Backups\GIS_Data_VA\NLCD\Products_2016\NLCD_imperv_20190405\NLCD_2006_Impervious_L48_20190405.img'
-   # in_Imperv20 = r'C:\Users\xch43889\Documents\Working\ConsVision\VulnMod\vuln_work.gdb\imperv2006_20plus'
+   # # in_Imperv20 = r'C:\Users\xch43889\Documents\Working\ConsVision\VulnMod\vuln_work.gdb\imperv2006_20plus'  # now generated in-function
    # out_Tracts = r'C:\Users\xch43889\Documents\Working\ConsVision\VulnMod\CensusWork2000.gdb\CensusTracts2000_70mi'
    # in_Year = 2000
    # in_Tracts = out_Tracts
@@ -294,19 +296,20 @@ def main():
    # # End of variable input
    #
    # # Specify function(s) to run below
-   # # PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Imperv20, out_Tracts, in_Year)
-   # # MakeUrbanCores(in_Blocks, out_Cores3)
+   # PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Year, out_Tracts)   # Note: removed in_Imperv20, now generated in-function
+   # MakeUrbanCores(in_Blocks, out_Cores3)
    # CategorizeCores(in_Cores)
 
+
+   # David's code:
    # Set up variables
    in_Blocks = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\CensusBlocks2010_70mile'
    in_PopTab = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\CensusBlocks2010_Pop'
-   # Uses the full-extent impervious raster, since the processing boundary is beyond the 50-mile version
+   # Uses the full-extent impervious raster, since the processing boundary is beyond the 50-mile version.
+   # The 2016 land cover was used for cores eventually used, since 2019 was not out at that point.
    in_Imperv = r'F:\David\GIS_data\NLCD\nlcd_2019_impervious_l48_20210604\nlcd_2019_impervious_l48_20210604.img'
-   # out_Tracts = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\CensusTracts2010_70mile'
    in_Year = 2010
-   # in_Tracts = out_Tracts
-   out_Cores = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\UrbanCores2010_w2019imp'
+   out_Cores = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\UrbanCores2010_method3_w2019imp'
 
    # End of variable input
 
