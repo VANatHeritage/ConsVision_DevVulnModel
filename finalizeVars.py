@@ -12,13 +12,20 @@ This script finalizes all variables for the Development Vulnerability Model. Thi
 Reads from an Excel File in the 'input/vars' folder, which includes the columns:
 ['varname', 'source_path', 'static', 'multiplier', 'use']
 """
-
-import numpy as np
 import pandas
 from Helper import *
 
 
 def finalizeVar(in_rast, out_rast, mask, mult=100):
+   """
+   Finalize a raster predictor, clipping and masking to the provide mask, applying a multiplier and
+   converting to integer.
+   :param in_rast: input raster
+   :param out_rast: output raster
+   :param mask: data mask
+   :param mult: Multiplier to apply to dataset.
+   :return: out_rast
+   """
 
    r = arcpy.sa.Raster(in_rast)
    print('Finalizing raster ' + in_rast + '...')

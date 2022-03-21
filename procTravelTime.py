@@ -21,7 +21,6 @@ def main():
    yr = '2019'
 
    costGDB = r'C:\David\proc\costSurface_' + yr + '.gdb'
-   # costGDB = r'F:\David\projects\vulnerability_model\vars\nlcd_based\cost_surfaces\costSurface_' + yr + '.gdb'
    costRastLoc = costGDB + os.sep + 'local_cost'
    costRastHwy = costGDB + os.sep + 'lah_cost'
    rampPts = costGDB + os.sep + 'ramp_points'
@@ -39,9 +38,9 @@ def main():
 
    # Input features
    if yr == '2006':
-      accFeat0 = r'F:\David\projects\vulnerability_model\vars\travel_time\UrbanCores2000\UrbanCores2000.shp'  # T1
+      accFeat0 = r'F:\David\projects\vulnerability_model\vars\travel_time\UrbanCores2000\UrbanCores2000.shp'
    elif yr == "2019":
-      accFeat0 = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\UrbanCores2010_method3'  # T2
+      accFeat0 = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\UrbanCores2010_method3'
    # Output geodatabase
    outGDB = r'C:\David\proc\urbanCores' + yr + '_travelTime.gdb'
 

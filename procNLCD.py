@@ -315,7 +315,6 @@ def main():
    # END HEADER
 
    # Impervious in neighborhood
-   # coulddo: implement alternative kernels?
    kl = MakeKernelList(out_folder + os.sep + 'kernels')
    ngh = MultiWeightKernels(kl)
 
@@ -350,35 +349,29 @@ def main():
       classes = [[[11], 'openwater'], [[90, 95], 'wetland']]  # [[41, 42, 43], 'forest']]
       EucDistNLCD(nlcd, classes, y)
 
-
-
    # Land cover cost
    for y in years:
       nlcd = nlcd_gdb + os.sep + 'lc_' + y
       CostNLCD(nlcd, y)
 
 
-   ### Multiple-year (change) variables
+   ### Multiple-year (change-based) variables.
+   # Year combination to process. The output raster will include latter year only in the name.
+   chg_yrs = [['2001', '2006'], ['2013', '2019']]
 
    # Impervious hot spots
-   tps = [[imp_gdb + os.sep + 'imperv_2001', imp_gdb + os.sep + 'imperv_2006'],
-          [imp_gdb + os.sep + 'imperv_2013', imp_gdb + os.sep + 'imperv_2019']]
-   for tp in tps:
-      t1 = tp[0]
-      t2 = tp[1]
-      y = t2[-4:]  # naming scheme (uses last year of sequence)
+   for y in chg_yrs:
+      t1 = imp_gdb + os.sep + 'imperv_' + y[0]
+      t2 = imp_gdb + os.sep + 'imperv_' + y[1]
       reps = [[20, 20000], [20, 50000], [20, 100000]]
       for i in reps:
-         ImpGrowthSpots(t1, t2, y, i[0], i[1], edist=True)
+         ImpGrowthSpots(t1, t2, y[1], i[0], i[1], edist=True)
 
    # New road euclidean distance
-   tps = [[imp_gdb + os.sep + 'impDescriptor_2001', imp_gdb + os.sep + 'impDescriptor_2006'],
-          [imp_gdb + os.sep + 'impDescriptor_2013', imp_gdb + os.sep + 'impDescriptor_2019']]
-   for tp in tps:
-      t1 = tp[0]
-      t2 = tp[1]
-      y = t2[-4:]  # naming scheme (uses last year of sequence)
-      NewRoadDist(t1, t2, y)
+   for y in chg_yrs:
+      t1 = imp_gdb + os.sep + 'impDescriptor_' + y[0]
+      t2 = imp_gdb + os.sep + 'impDescriptor_' + y[1]
+      NewRoadDist(t1, t2, y[1])
 
 
 if __name__ == '__main__':

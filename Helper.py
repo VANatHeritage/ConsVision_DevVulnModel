@@ -1,16 +1,13 @@
-# ----------------------------------------------------------------------------------------
-# Helper.py
-# Version:  ArcGIS 10.3.1 / Python 2.7.8
-# Creation Date: 2017-08-08
-# Last Edit: 2019-10-02
-# Creator:  Kirsten R. Hazler
+"""
+Helper.py
+Version:  ArcGIS Pro / Python 3.x
+Creation Date: 2017-08-08
+Last Edit: 2021-03-21
+Creator:  Kirsten R. Hazler / David Bucklin
 
-# Summary:
-# A library of generally useful helper functions 
-
-# ----------------------------------------------------------------------------------------
-
-# Import modules
+Summary:
+A library of generally useful helper functions.
+"""
 import os
 import sys
 import traceback

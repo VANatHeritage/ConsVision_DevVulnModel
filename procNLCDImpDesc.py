@@ -18,8 +18,7 @@ as the Tiger 2018 LAH/ramps.
 
 These cost rasters can be used with the ServiceAreas toolset (https://github.com/VANatHeritage/ServiceAreas).
 
-FIXME: Tunnels are not represented in this dataset (they are not surface roads).
- Fixed: Major tunnels were manually digitized and are burned in to the dataset (see 'burnin_tunnels' feature class)
+Major tunnels were manually digitized and are burned in to the dataset (see 'burnin_tunnels' feature class).
 """
 from Helper import *
 
@@ -115,36 +114,27 @@ def ImpDesc_CostSurf(impDesc, urbanAreas, out_gdb, lah, ramps, ramp_pts, burn_tu
 def main():
 
    # Year to process
-   nlcd_year = '2006'
+   nlcd_year = '2019'
 
    # NOTE: Adjust TIGER to use based on nlcd_year (TIGER should be from a later date)
    # Tiger/Line roads (only LAH and ramps are used from this dataset, for reclassifying those roads. Need to make
    # sure that dataset used is from year AFTER the nlcd_year.
-   if nlcd_year == '2006':
-      road = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\all_centerline'
-   else:
-      road = r'F:\David\projects\RCL_processing\Tiger_2020\roads_proc.gdb\all_centerline'
+   road = r'F:\David\projects\RCL_processing\Tiger_2020\roads_proc.gdb\all_centerline'
    # Get road subset layers from Tiger
    lah = arcpy.MakeFeatureLayer_management(road, where_clause="MTFCC IN ('S1100')")
    ramps = arcpy.MakeFeatureLayer_management(road, where_clause="MTFCC IN ('S1630')")
    ramp_pts = r'F:\David\projects\RCL_processing\Tiger_2020\cost_surfaces.gdb\rmpt_final'
 
-   # burn in tunnels feature class (FIXED to Tiger_2018)
+   # burn in tunnels feature class (FIXED PATH)
    burn_tunnels = r'F:\David\projects\RCL_processing\Tiger_2018\roads_proc.gdb\burnin_tunnels'
-
-   # OSM (not using)
-   # lah_rmp = r'D:\projects\OSM\network\OSM_RoadsNet_Albers.gdb\Roads_Hwy'
-   # lah = arcpy.MakeFeatureLayer_management(lah_rmp, where_clause="code = 5111")
-   # ramp = arcpy.MakeFeatureLayer_management(lah_rmp, where_clause="code = 5131")
-   # ramp_pts = r'D:\projects\OSM\network\OSM_RoadsNet_Albers.gdb\ramp_points'
 
    # Impervious descriptor
    impDesc = r'F:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_Impervious_albers.gdb\impDescriptor_' + nlcd_year
-   # urban areas
+   # urban areas (FIXED PATH)
    urbanAreas = r'F:\David\GIS_data\US_CENSUS_TIGER\UrbanAreas\tl_2016_us_uac10\tl_2016_us_uac10.shp'
 
    # workspace (will be created if not existing)
-   out_gdb = r'C:\David\proc\costSurface_' + nlcd_year + '.gdb'  # copy to: r'F:\David\projects\vulnerability_model\vars\nlcd_based\cost_surfaces\costSurface_' + nlcd_year + '.gdb'
+   out_gdb = r'C:\David\proc\costSurface_' + nlcd_year + '.gdb'
    make_gdb(out_gdb)
    arcpy.env.workspace = out_gdb
 
@@ -170,6 +160,9 @@ def main():
    arcpy.sa.EucDistance("tmp_ed").save('lah_edist')
    # Create pyramids
    arcpy.BuildPyramidsandStatistics_management(out_gdb)
+
+   # out_gdb was copied to: r'F:\David\projects\vulnerability_model\vars\nlcd_based\cost_surfaces\costSurface_' + nlcd_year + '.gdb'
+
 
 if __name__ == '__main__':
    main()
