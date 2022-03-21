@@ -6,9 +6,8 @@ Creator: David Bucklin
 
 Summary: This script contains processes to create a sampling mask, point samples, and attribute those samples with
 values from raster variables.
+It also includes the steps used to make water/developed masks for adjusting the final model.
 """
-
-import arcpy.sa
 import pandas
 from Helper import *
 
@@ -53,6 +52,13 @@ def devChgImp(t1, t2, out, develmin=1, keep_intermediate=False):
 
 
 def makeSampMask(exclList, outRast, mask=None):
+   """Given a list of [raster, exclusion query], make a mask indicating where samples can be placed. Exclusion queries
+   are SQL which indicate where samples cannot be placed (e.g. "Value = 11", for water in NLCD).
+   :param exclList: list of rasters and associated exclusion query (e.g. [[r1, query], [r2, query], ...])
+   :param outRast: Output raster sampling mask
+   :param mask: global mask to apply to processing
+   :return: outRast
+   """
 
    with arcpy.EnvManager(mask=mask):
       print('Making sampling mask `' + outRast + '`...')
@@ -69,21 +75,98 @@ def makeSampMask(exclList, outRast, mask=None):
       arcpy.Delete_management(nmList)
 
 
-def attSamps(sampPts, rastFld, extra=None, strataFeat=None):
-   # Function checks if fields exist throughout function, so this can be used to update an existing sample dataset.
+def makeStrataFeat(inFeat, outFeat, inBnd, trainPercentage=50):
+   """
+   Create a sampling strata feature class
+   :param inFeat: input features
+   :param outFeat: output features, with new attributes [SampleType, SRC_FEAT]
+   :param inBnd: boundary polygon feature class. Only features intersecting this layer will be included
+   :param trainPercentage: Percentage of feature to include in the training data stratum. All other will be validation.
+   :return: outFeat
+   """
+   print("Selecting strata features intersecting bounding polygon...")
+   lyr = arcpy.MakeFeatureLayer_management(inFeat)
+   arcpy.SelectLayerByLocation_management(lyr, "INTERSECT", inBnd)
+   arcpy.CopyFeatures_management(lyr, 'tmp_int')
+   print("Making strata features...")
+   arcpy.SubsetFeatures_ga('tmp_int', 'tmp_trn', 'tmp_test', trainPercentage, "PERCENTAGE_OF_INPUT")
+   arcpy.CalculateField_management('tmp_trn', 'SampleType', "'training'")
+   arcpy.CalculateField_management('tmp_test', 'SampleType', "'validation'")
+   arcpy.Merge_management(['tmp_trn', 'tmp_test'], outFeat)
+   arcpy.CalculateField_management(outFeat, 'SRC_FEAT', "'" + os.path.basename(inFeat) + "'")
+   arcpy.Delete_management(['tmp_trn', 'tmp_test'])
+   return outFeat
+
+
+def makeSamps(devChg, sampMask, strataFeat, outTrain, outValidation):
+   """
+   Create point samples
+   :param devChg: Development change status raster
+   :param sampMask: Sampling mask (raster)
+   :param strataFeat: Strata feature class
+   :param outTrain: output training points feature class
+   :param outValidation: output validation points feature class
+   :return: [outTrain, outValidation]
+   """
+   print("Masking development change to sampling mask...")
+   dc = 'tmp_dc'
+   arcpy.sa.ExtractByMask(devChg, sampMask).save(dc)
+
+   print("Making points for developed class...")
+   arcpy.sa.SetNull(dc, 1, "Value <> 1").save('tmp_dev')
+   # Make new-development points
+   arcpy.RasterToPolygon_conversion('tmp_dev', 'tmp_dev_polys', "NO_SIMPLIFY", "Value", "SINGLE_OUTER_PART")
+   lyr = arcpy.MakeFeatureLayer_management('tmp_dev_polys', where_clause="Shape_Area >= 8100")
+   arcpy.CreateRandomPoints_management(arcpy.env.workspace, "tmp_DevPts", lyr, "0 0 250 250", 3, "0.5 Miles", "POINT")
+   del lyr
+   arcpy.DeleteIdentical_management("tmp_DevPts", "Shape", "0.5 Miles")
+   arcpy.CalculateField_management('tmp_DevPts', 'DevStatus', '1', field_type="SHORT")
+
+   print("Making points for not-developed class...")
+   arcpy.CreateRandomPoints_management(arcpy.env.workspace, "tmp_NoDevPts", strataFeat,
+                                       "0 0 250 250", 10, "0.5 Miles", "POINT")
+   arcpy.sa.ExtractMultiValuesToPoints('tmp_NoDevPts', [dc])
+   # Remove points not falling in DevChg = 0 areas.
+   lyr = arcpy.MakeFeatureLayer_management('tmp_NoDevPts')
+   arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", dc + " = 0", "INVERT")
+   arcpy.DeleteFeatures_management(lyr)
+   del lyr
+   # Thin points
+   arcpy.DeleteIdentical_management('tmp_NoDevPts', "Shape", "0.5 Miles")
+   arcpy.CalculateField_management('tmp_NoDevPts', 'DevStatus', '0', field_type="SHORT")
+
+   print("Creating `" + outTrain + "` and `" + outValidation + "` datasets...")
+   arcpy.Merge_management(['tmp_DevPts', 'tmp_NoDevPts'], 'tmp_all_samples')
+   todel = [a.name for a in arcpy.ListFields('tmp_all_samples') if a.name not in ['OBJECTID', 'Shape', 'DevStatus']]
+   arcpy.DeleteField_management('tmp_all_samples', todel)
+   arcpy.JoinAttributesFromPolygon_ca('tmp_all_samples', strataFeat, ["SRC_FEAT", "Unique_ID", "SampleType"])
+   arcpy.AlterField_management('tmp_all_samples', 'Unique_ID', 'gridid', 'Unique_ID')
+   arcpy.Select_analysis('tmp_all_samples', outTrain, "SampleType = 'training'")
+   arcpy.Select_analysis('tmp_all_samples', outValidation, "SampleType = 'validation'")
+
+   return [outTrain, outValidation]
+
+
+def attSamps(sampPts, rastFold, extra=None):
+   """
+   Attribute samples with values from a set of raster datasets. Fields are added to the existing feature class. The
+   function checks if fields already exist, and skips processing for rasters matching those fields.
+   :param sampPts: Input sample points
+   :param rastFold: Folder holding rasters
+   :param extra: List of rasters (which are not found in rastFold) for which to extract values.
+   :return: sampPts
+
+   NOTE: `extra` can accept paths to 'static' variables not stored in the raster folder (`rastFold`), which would
+   then also be included as attributes. Not needed unless attributing samples outside of the training time period.
+   ex = vars['varname'][vars['static'] == 1]
+   extra = [rastLoc + os.sep + '2006' + os.sep + e + '.tif' for e in ex.to_list()]
+   """
    flds = [a.name for a in arcpy.ListFields(sampPts)]
    if "sampID" not in flds:
       print('Adding sampID field...')
       arcpy.CalculateField_management(sampPts, 'sampID', '!OBJECTID!', field_type="LONG")
-   if strataFeat is not None:
-      if 'gridid' in flds:
-         arcpy.DeleteField_management(sampPts, 'gridid')
-      print('Adding Unique_ID from strata features (new field name = gridid)...')
-      arcpy.SpatialJoin_analysis(sampPts, strataFeat[0], 'tmp_sj')
-      arcpy.JoinField_management(sampPts, 'sampID', 'tmp_sj', 'sampID', strataFeat[1])
-      arcpy.AlterField_management(sampPts, strataFeat[1], 'gridid', clear_field_alias=True)
-   with arcpy.EnvManager(workspace=rastFld):
-      ls = [rastFld + os.sep + l for l in arcpy.ListRasters('*.tif') if l.replace('.tif', '') not in flds]
+   with arcpy.EnvManager(workspace=rastFold):
+      ls = [rastFold + os.sep + l for l in arcpy.ListRasters('*.tif') if l.replace('.tif', '') not in flds]
    if extra:
       ls = ls + [a for a in extra if os.path.basename(a).replace('.tif', '') not in flds]
    if len(ls) > 0:
@@ -109,8 +192,8 @@ def main():
    arcpy.env.overwriteOutput = True
 
    # Folder/gdb for outputs
-   outFold = r'D:/git/ConsVision_DevVulnModel/inputs/samples'
-   gdb = 'D:/git/ConsVision_DevVulnModel/inputs/samples/samples.gdb'
+   outFold = r'D:\git\ConsVision_DevVulnModel\inputs\samples'
+   gdb = r'D:\git\ConsVision_DevVulnModel\inputs\samples\samples.gdb'
    make_gdb(gdb)
    arcpy.env.workspace = gdb
 
@@ -118,8 +201,8 @@ def main():
    bnd = r'D:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb\jurisbnd_lam_clipbound'
 
    # NLCD Land cover and impervious gdbs
-   lc_gdb = r'L:/David/GIS_data/NLCD/nlcd_2019/nlcd_2019ed_LandCover_albers.gdb'
-   imp_gdb = r'L:/David/GIS_data/NLCD/nlcd_2019/nlcd_2019ed_Impervious_albers.gdb'
+   lc_gdb = r'L:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_LandCover_albers.gdb'
+   imp_gdb = r'L:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_Impervious_albers.gdb'
 
    # Folder where predictor variable rasters are stored
    rastLoc = r'D:\git\ConsVision_DevVulnModel\inputs\vars'
@@ -129,77 +212,75 @@ def main():
    vars = pandas.read_excel(vars_path, usecols=['varname', 'source_path', 'static', 'use'])
 
    # Original sample points
-   sampPts0 = 'TrainingPoints_0616_orig'  # this is an original copy from the feature service
+   # sampPts0 = 'TrainingPoints_0616_orig'  # this is an original copy from the feature service
 
-   # Strata features / Unique ID column name
-   strataFeat = [r'F:\David\GIS_data\snap_template_data\NestedHexes.gdb\Diam_03mile', 'Unique_ID']
+   # Strata features. Needs to have a column `Unique_ID` for unique polygons
+   inStrata = r'F:\David\GIS_data\snap_template_data\NestedHexes.gdb\Diam_03mile'
 
    # END HEADER
 
 
-   ## 1. Sampling mask
-   year = '2006'
+   ## 1. Make sampling mask
+   var_yr = '2006'
    # list of raster + where clause combinations, indicating which pixels should be EXCLUDED from the sampling mask.
-   exclList = [[r'D:/git/ConsVision_DevVulnModel/inputs/masks/conslands_pmult_' + year + '.tif', 'Value = 0'],
-               ['D:/git/ConsVision_DevVulnModel/inputs/vars/' + year + '/roadDist.tif', 'Value > 2000'],
+   exclList = [['D:/git/ConsVision_DevVulnModel/inputs/masks/conslands_pmult_' + var_yr + '.tif', 'Value = 0'],
+               ['D:/git/ConsVision_DevVulnModel/inputs/vars/' + var_yr + '/roadDist.tif', 'Value > 2000'],
                ['D:/git/ConsVision_DevVulnModel/inputs/vars/2006/slpx100.tif', 'Value > 7000'],
-               [lc_gdb + os.sep + 'lc_' + year, 'Value = 11'],
-               [imp_gdb + os.sep + 'imperv_' + year, 'Value > 0']]
-   sampMask = outFold + os.sep + 'sampMask_' + year + '.tif'
+               [lc_gdb + os.sep + 'lc_' + var_yr, 'Value = 11'],
+               [imp_gdb + os.sep + 'imperv_' + var_yr, 'Value > 0']]
+   sampMask = outFold + os.sep + 'sampMask_' + var_yr + '.tif'
    if not arcpy.Exists(sampMask):
       makeSampMask(exclList, sampMask, mask=bnd)
 
 
-   ## 2. Make development change raster, and sample points
-   chg = [['06', '16']]  #, ['16', '19']]
-   for y in chg:
-      devChg = outFold + os.sep + 'DevChg' + y[0] + '_' + y[1] + '.tif'  # any impervious
-      if not arcpy.Exists(devChg):
-         print('Raster ' + devChg + ' does not exist, making new...')
-         # Development change (any impervious).
-         devChgImp(imp_gdb + os.sep + 'imperv_20' + y[0], imp_gdb + os.sep + 'imperv_20' + y[1], devChg, develmin=1)
-
-   # TODO: add Kirsten's sample point generation function.
-
-   ## 3. Attribute sample points
-
-   # Attribute sample points with all variables.
-   year = "2006"
-   if year == "2016":
-      # NOTE: DID NOT USE.
-      # [extra] holds paths to 'static' variables stored in the 2006 folder only.
-      # They should get attached to 2016, if sample points are generated for that time period.
-      ex = vars['varname'][vars['static'] == 1]
-      extra = [rastLoc + os.sep + '2006' + os.sep + e + '.tif' for e in ex.to_list()]
-      sampPts = 'TrainingPoints_1619'
-   else:
-      extra = None
-      sampPts = 'TrainingPoints_0616'
-   if not arcpy.Exists(sampPts):
-      arcpy.CopyFeatures_management(sampPts0, sampPts)
-   attSamps(sampPts, rastLoc + os.sep + year, extra, strataFeat)
+   ## 2. Make development change raster
+   chg_yrs = ['06', '16']
+   devChg = outFold + os.sep + 'DevChg' + chg_yrs[0] + '_' + chg_yrs[1] + '.tif'
+   if not arcpy.Exists(devChg):
+      print('Raster ' + devChg + ' does not exist, making new...')
+      devChgImp(imp_gdb + os.sep + 'imperv_20' + chg_yrs[0], imp_gdb + os.sep + 'imperv_20' + chg_yrs[1], devChg)
 
 
-   ## 4. Make masks used to apply to adjusted model rasters
+   ## 3. Generate sample points
+   chg_yrs = ['06', '16']
+   devChg = outFold + os.sep + 'DevChg' + chg_yrs[0] + '_' + chg_yrs[1] + '.tif'
+   sampMask = outFold + os.sep + 'sampMask_20' + chg_yrs[0] + '.tif'
+   # outputs
+   strataFeat = 'test_HexStrata'
+   outTrain = 'test_TrainingPoints_' + chg_yrs[0] + chg_yrs[1]
+   outValidation = 'test_ValidationPoints_' + chg_yrs[0] + chg_yrs[1]
 
+   makeStrataFeat(inStrata, strataFeat, bnd)
+   makeSamps(devChg, sampMask, strataFeat, outTrain, outValidation)
+
+
+   ## 4. Attribute sample points
+   chg_yrs = ['06', '16']
+   sampPts = 'test_TrainingPoints_' + chg_yrs[0] + chg_yrs[1]
+   attSamps(sampPts, rastLoc + os.sep + '20' + chg_yrs[0], extra=None)
+
+
+   ## 5. Make masks used to apply to adjusted model rasters
    # Water mask. This covers ONLY areas within the Virginia boundary.
    va_bnd = r'D:\git\ConsVision_DevVulnModel\ArcGIS\dev_vuln.gdb\VirginiaCounty_Dissolve'
    out_dir = r'D:\git\ConsVision_DevVulnModel\inputs\masks'
    years = ['2006', '2019']
-   for year in years:
-      out_rast = out_dir + os.sep + 'water_mask_' + year + '.tif'
+   # Water mask (used for setting water to NoData in adjusted model rasters)
+   for y in years:
+      out_rast = out_dir + os.sep + 'water_mask_' + y + '.tif'
       print(out_rast)
       with arcpy.EnvManager(extent=va_bnd, mask=va_bnd):
-         arcpy.sa.SetNull(lc_gdb + os.sep + 'lc_' + year, 1, 'Value = 11').save(out_rast)
+         arcpy.sa.SetNull(lc_gdb + os.sep + 'lc_' + y, 1, 'Value = 11').save(out_rast)
    # Development masks (used for setting already-developed to 101 in adjusted model rasters)
-   for year in years:
-      out_rast = out_dir + os.sep + 'dev_mask_' + year + '.tif'
+   for y in years:
+      out_rast = out_dir + os.sep + 'dev_mask_' + y + '.tif'
       print(out_rast)
       with arcpy.EnvManager(extent=va_bnd, mask=va_bnd):
-         arcpy.sa.SetNull(imp_gdb + os.sep + 'imperv_' + year, 1, 'Value > 0').save(out_rast)
+         arcpy.sa.SetNull(imp_gdb + os.sep + 'imperv_' + y, 1, 'Value > 0').save(out_rast)
 
    # clean up
    arcpy.Delete_management(arcpy.ListFeatureClasses('tmp_*') + arcpy.ListRasters('tmp_*'))
+
 
 if __name__ == '__main__':
    main()
