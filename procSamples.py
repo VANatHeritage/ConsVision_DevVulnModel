@@ -8,7 +8,6 @@ Summary: This script contains processes to create a sampling mask, point samples
 values from raster variables.
 It also includes the steps used to make water/developed masks for adjusting the final model.
 """
-import pandas
 from Helper import *
 
 
@@ -204,8 +203,8 @@ def main():
    bnd = r'D:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb\jurisbnd_lam_clipbound'
 
    # NLCD Land cover and impervious gdbs
-   lc_gdb = r'L:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_LandCover_albers.gdb'
-   imp_gdb = r'L:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_Impervious_albers.gdb'
+   lc_gdb = r'F:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_LandCover_albers.gdb'
+   imp_gdb = r'F:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_Impervious_albers.gdb'
 
    # Folder where predictor variable rasters are stored
    rastLoc = r'D:\git\ConsVision_DevVulnModel\inputs\vars'

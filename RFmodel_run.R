@@ -102,7 +102,7 @@ repl <- T
 frac <- 1
 bal <- 1
 
-# Initial variable importance
+# Get initial variable importance, variable correlation tree
 if (sub.nm == "AllVars") {
   
   rf0.rf <- randomForest(y~., data=d[c("y",ev1)],
@@ -113,11 +113,10 @@ if (sub.nm == "AllVars") {
                 strata = d$y,
                 sampsize = ssz(d, frac, bal),  # Just use default sampling to determine variable importance.
                 importance = TRUE)
-  
   # Summarize variable importance
-  # (scale or not?): https://explained.ai/rf-importance/#6.2 : Notice that the function does not normalize the importance values, 
-  # such as dividing by the standard deviation. According to Conditional variable importance for random forests, 
-  # “the raw [permutation] importance… has better statistical properties.”
+  # Decided to use scale=F, see [https://explained.ai/rf-importance/#6.2]: 'Notice that the function does not normalize the 
+  # importance values, such as dividing by the standard deviation. According to Conditional variable importance for random forests, 
+  # “the raw [permutation] importance… has better statistical properties.”'
   imp <- as.data.frame(importance(rf0.rf, scale = F)) %>% arrange(desc(MeanDecreaseAccuracy)) # as.data.frame(rf0.rf$importance)
   imp$var <- row.names(imp)
   
@@ -337,7 +336,7 @@ write.csv(df.cv[cols.keep], file=paste0(proj.o, "/crossValid_stats_folds.csv"), 
 
 # Output CV points to GDB
 g2 <- merge(d0["sampID"], df.cv.full, by="sampID")
-arc.write(paste0("D:/git/ConsVision_DevVulnModel/outputs/samples_validation.gdb/", proj.mod, "_pts"), g2, overwrite=T)
+arc.write(paste0("outputs/samples_validation.gdb/", proj.mod, "_pts"), g2, overwrite=T)
 
 # END Cross-validation
 

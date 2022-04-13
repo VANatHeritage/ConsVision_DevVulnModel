@@ -8,7 +8,7 @@
 # Author: David Bucklin
 # Created: 2021-10-21
 # 
-# Usage: functions called at the end of model.R. Can be used separately as well.
+# Usage: functions called at the end of model.R. Can be used independently as well.
 # Note: these functions include datasets with fixed paths/names; would need to adjust to run in a new environment.
 
 setwd("D:/git/ConsVision_DevVulnModel")
@@ -72,12 +72,12 @@ pred.adjust <- function(proj.mod, year) {
   in.pred <- raster(paste0(out.mod, ".tif"))
   
   # masks
-  dev.mask <- raster(paste0('D:/git/ConsVision_DevVulnModel/inputs/masks/dev_mask_', year, '.tif'))
-  wat.mask <- raster(paste0('D:/git/ConsVision_DevVulnModel/inputs/masks/water_mask_', year, '.tif'))
+  dev.mask <- raster(paste0('inputs/masks/dev_mask_', year, '.tif'))
+  wat.mask <- raster(paste0('inputs/masks/water_mask_', year, '.tif'))
   
   # protection multiplier
   if (year == "2019") conyear <- 'current' else conyear <- year
-  pmult <- raster(paste0('D:/git/ConsVision_DevVulnModel/inputs/masks/conslands_pmultBMI_', conyear, '.tif'))
+  pmult <- raster(paste0('inputs/masks/conslands_pmultBMI_', conyear, '.tif'))
   
   message('Applying protection multiplier...')
   r.pred2 <- round(in.pred * pmult)
@@ -99,7 +99,7 @@ pred.adjust <- function(proj.mod, year) {
 indp.validate <- function(proj.mod) {
   
   # for output validation samples / grids
-  out.gdb <- 'D:/git/ConsVision_DevVulnModel/outputs/samples_validation.gdb'
+  out.gdb <- 'outputs/samples_validation.gdb'
   
   # load model
   proj.o <- paste0("outputs/", proj.mod)
@@ -117,7 +117,7 @@ indp.validate <- function(proj.mod) {
   v1$y <- v1$DevStatus
   
   # protection multiplier
-  pmult <- raster(paste0('D:/git/ConsVision_DevVulnModel/inputs/masks/conslands_pmultBMI_2006.tif'))
+  pmult <- raster(paste0('inputs/masks/conslands_pmultBMI_2006.tif'))
   
   # prediction rasters
   pred.rast.raw <- raster(paste0(proj.o, "/", proj.mod, "_2006.tif"))
@@ -187,7 +187,7 @@ indp.validate <- function(proj.mod) {
     write.csv(df.ov[,1:7], file=paste0(proj.o, "/indpValid", pt, "_stats.csv"), row.names = F)
     
     # Output CV points to GDB
-    arc.write(paste0("D:/git/ConsVision_DevVulnModel/outputs/samples_validation.gdb/", proj.mod, "_indpValid", pt, "_pts"), v1, overwrite=T)
+    arc.write(paste0("outputs/samples_validation.gdb/", proj.mod, "_indpValid", pt, "_pts"), v1, overwrite=T)
   }
   
   # combined P-R curve (with CV)

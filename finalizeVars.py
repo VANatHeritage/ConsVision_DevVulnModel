@@ -12,7 +12,6 @@ This script finalizes all predictor variables for the Development Vulnerability 
 Reads from an Excel File in the 'input/vars' folder, which includes the columns:
 ['varname', 'source_path', 'static', 'multiplier', 'use']
 """
-import pandas
 from Helper import *
 
 
