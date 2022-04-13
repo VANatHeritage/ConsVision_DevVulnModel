@@ -13,7 +13,7 @@ from Helper import *
 
 
 def devChgImp(t1, t2, out, develmin=1, keep_intermediate=False):
-   """Generate development change raster, based on impervious surface percentage from two time periods from NLCD.
+   """Generate development change status raster, based on impervious surface percentage from two time periods from NLCD.
    0 = not developed in either time period;
    1 = went from undeveloped to developed;
    2 = developed both time periods;
@@ -52,14 +52,13 @@ def devChgImp(t1, t2, out, develmin=1, keep_intermediate=False):
 
 
 def makeSampMask(exclList, outRast, mask=None):
-   """Given a list of [raster, exclusion query], make a mask indicating where samples can be placed. Exclusion queries
-   are SQL which indicate where samples cannot be placed (e.g. "Value = 11", for water in NLCD).
+   """Given a list of of rasters and exclusion queries, make a mask indicating where samples can be placed.
+   Exclusion queries are SQL which indicate where samples cannot be placed (e.g. "Value = 11" for water in NLCD).
    :param exclList: list of rasters and associated exclusion query (e.g. [[r1, query], [r2, query], ...])
    :param outRast: Output raster sampling mask
    :param mask: global mask to apply to processing
    :return: outRast
    """
-
    with arcpy.EnvManager(mask=mask):
       print('Making sampling mask `' + outRast + '`...')
       ct = 0
@@ -81,7 +80,8 @@ def makeStrataFeat(inFeat, outFeat, inBnd, trainPercentage=50):
    :param inFeat: input features
    :param outFeat: output features, with new attributes [SampleType, SRC_FEAT]
    :param inBnd: boundary polygon feature class. Only features intersecting this layer will be included
-   :param trainPercentage: Percentage of feature to include in the training data stratum. All other will be validation.
+   :param trainPercentage: Percentage of features to include in the training data stratum. All others assigned to
+   validation.
    :return: outFeat
    """
    print("Selecting strata features intersecting bounding polygon...")
@@ -100,7 +100,7 @@ def makeStrataFeat(inFeat, outFeat, inBnd, trainPercentage=50):
 
 def makeSamps(devChg, sampMask, strataFeat, outTrain, outValidation):
    """
-   Create point samples
+   Create training and validation point samples.
    :param devChg: Development change status raster
    :param sampMask: Sampling mask (raster)
    :param strataFeat: Strata feature class
@@ -156,8 +156,11 @@ def attSamps(sampPts, rastFold, extra=None):
    :param extra: List of rasters (which are not found in rastFold) for which to extract values.
    :return: sampPts
 
-   NOTE: `extra` can accept paths to 'static' variables not stored in the raster folder (`rastFold`), which would
-   then also be included as attributes. Not needed unless attributing samples outside of the training time period.
+   NOTE: `extra` can accept paths to 'static' variables rasters which are not in the provided raster folder
+   (`rastFold`), which would then also be included as attributes. In practice, this is only needed for attributing
+   samples outside of the training time period, which was not necessary for the 2022 model. Example below.
+   vars_path = r'D:\git\ConsVision_DevVulnModel\inputs\vars\vars_DV.xlsx'
+   vars = pandas.read_excel(vars_path, usecols=['varname', 'source_path', 'static', 'use'])
    ex = vars['varname'][vars['static'] == 1]
    extra = [rastLoc + os.sep + '2006' + os.sep + e + '.tif' for e in ex.to_list()]
    """
@@ -207,13 +210,6 @@ def main():
    # Folder where predictor variable rasters are stored
    rastLoc = r'D:\git\ConsVision_DevVulnModel\inputs\vars'
 
-   # Predictor variable spreadsheet
-   vars_path = r'D:\git\ConsVision_DevVulnModel\inputs\vars\vars_DV.xlsx'
-   vars = pandas.read_excel(vars_path, usecols=['varname', 'source_path', 'static', 'use'])
-
-   # Original sample points
-   # sampPts0 = 'TrainingPoints_0616_orig'  # this is an original copy from the feature service
-
    # Strata features. Needs to have a column `Unique_ID` for unique polygons
    inStrata = r'F:\David\GIS_data\snap_template_data\NestedHexes.gdb\Diam_03mile'
 
@@ -222,7 +218,7 @@ def main():
 
    ## 1. Make sampling mask
    var_yr = '2006'
-   # list of raster + where clause combinations, indicating which pixels should be EXCLUDED from the sampling mask.
+   # list of raster + clause combinations, clauses indicating which pixels should be EXCLUDED from the sampling mask.
    exclList = [['D:/git/ConsVision_DevVulnModel/inputs/masks/conslands_pmult_' + var_yr + '.tif', 'Value = 0'],
                ['D:/git/ConsVision_DevVulnModel/inputs/vars/' + var_yr + '/roadDist.tif', 'Value > 2000'],
                ['D:/git/ConsVision_DevVulnModel/inputs/vars/2006/slpx100.tif', 'Value > 7000'],
@@ -242,13 +238,17 @@ def main():
 
 
    ## 3. Generate sample points
+   # NOTE: Training/Validation points for the 2022 model were developed manually in ArcGIS Pro.
+   # The functions used in this step were added later to replicate the process used.
+   # Links to the feature services used in the 2022 model:
+   # Training points: https://arcg.is/1XuOWv
+   # Validation points: https://arcg.is/1TmvDC1
    chg_yrs = ['06', '16']
    devChg = outFold + os.sep + 'DevChg' + chg_yrs[0] + '_' + chg_yrs[1] + '.tif'
    sampMask = outFold + os.sep + 'sampMask_20' + chg_yrs[0] + '.tif'
-   # outputs
-   strataFeat = 'test_HexStrata'
-   outTrain = 'test_TrainingPoints_' + chg_yrs[0] + chg_yrs[1]
-   outValidation = 'test_ValidationPoints_' + chg_yrs[0] + chg_yrs[1]
+   strataFeat = 'HexStrata'
+   outTrain = 'TrainingPoints_' + chg_yrs[0] + chg_yrs[1]
+   outValidation = 'ValidationPoints_' + chg_yrs[0] + chg_yrs[1]
 
    makeStrataFeat(inStrata, strataFeat, bnd)
    makeSamps(devChg, sampMask, strataFeat, outTrain, outValidation)
@@ -256,7 +256,7 @@ def main():
 
    ## 4. Attribute sample points
    chg_yrs = ['06', '16']
-   sampPts = 'test_TrainingPoints_' + chg_yrs[0] + chg_yrs[1]
+   sampPts = 'TrainingPoints_' + chg_yrs[0] + chg_yrs[1]
    attSamps(sampPts, rastLoc + os.sep + '20' + chg_yrs[0], extra=None)
 
 

@@ -4,7 +4,7 @@ Version: ArcGIS Pro
 Creation Date: 2021-09-07
 Creator: David Bucklin
 
-This script finalizes all variables for the Development Vulnerability Model. This includes:
+This script finalizes all predictor variables for the Development Vulnerability Model. This includes:
 - Clip/Mask to study area
 - If not already integer: apply multiplier and convert to integer
 - Output to TIF file
@@ -53,7 +53,8 @@ def main():
    # Load variable table
    vars_path = r'D:\git\ConsVision_DevVulnModel\inputs\vars\vars_DV.xlsx'
    vars = pandas.read_excel(vars_path, usecols=['varname', 'source_path', 'static', 'multiplier', 'use'])
-   # Years for multi-temporal variables. In the excel file, the path uses the first year (2006). The only difference in
+
+   # Years for predictor variables. In the excel file, the path uses the first year (2006). The only difference in
    # paths between source rasters is the year, so a replace is used to get the path of the second year raster (2019).
    years = ['2006', '2019']
 

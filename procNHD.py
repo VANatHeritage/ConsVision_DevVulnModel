@@ -8,7 +8,7 @@ Summary:
 Processing for NHD-based predictor variables for the Development vulnerability model.
 
 NOTE: these variables were originally processed in the NLCD variable geodatabase:
-out_folder = r'F:\David\projects\vulnerability_model\vars\nlcd_based\nlcdv19_variables.gdb'
+out_gdb = r'F:\David\projects\vulnerability_model\vars\nlcd_based\nlcdv19_variables.gdb'
 """
 from Helper import *
 

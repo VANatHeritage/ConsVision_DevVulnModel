@@ -10,11 +10,9 @@ assigning road speeds, and creating cost surfaces, where both Limited access hig
 rasters are output. Euclidean distance to each road type (local, ramp, and highway) are also generated, to use as
 predictor variables.
 
-Tiger roads are used to define limited access highways and ramps. 2018 Tiger was used,
-as this dataset was found to have the better LAH/ramp classification than older datasets (i.e. 2016).
-This information is only used to reclassify the impervious descriptor dataset (it does not "create" roads).
-This potentially could miss LAH/ramps from earlier time periods that are not in the same location
-as the Tiger 2018 LAH/ramps.
+Recent Tiger roads were used to define limited access highways and ramps. This information is only used to reclassify
+the impervious descriptor dataset (it does not "create" roads). This potentially could miss LAH/ramps from earlier time
+periods that are not in the same location as the Tiger LAH/ramps.
 
 These cost rasters can be used with the ServiceAreas toolset (https://github.com/VANatHeritage/ServiceAreas).
 
@@ -116,11 +114,9 @@ def main():
    # Year to process
    nlcd_year = '2019'
 
-   # NOTE: Adjust TIGER to use based on nlcd_year (TIGER should be from a later date)
-   # Tiger/Line roads (only LAH and ramps are used from this dataset, for reclassifying those roads. Need to make
-   # sure that dataset used is from year AFTER the nlcd_year.
+   # Tiger/Line roads. Only LAH and ramps are used from this dataset, for reclassifying those roads.
+   # Need to make sure that dataset used is from year AFTER the nlcd_year.
    road = r'F:\David\projects\RCL_processing\Tiger_2020\roads_proc.gdb\all_centerline'
-   # Get road subset layers from Tiger
    lah = arcpy.MakeFeatureLayer_management(road, where_clause="MTFCC IN ('S1100')")
    ramps = arcpy.MakeFeatureLayer_management(road, where_clause="MTFCC IN ('S1630')")
    ramp_pts = r'F:\David\projects\RCL_processing\Tiger_2020\cost_surfaces.gdb\rmpt_final'

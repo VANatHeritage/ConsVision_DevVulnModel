@@ -8,7 +8,7 @@ This script runs raster cost distance (travel time) analyses for urban areas and
 development vulnerability model.
 
 Prerequisites: Cost surfaces developed using procNLCDImpDesc.py. Uses the ServiceAreas toolset (a standalone
-repository) to run travel time analyses.
+repository) to run travel time analyses. (https://github.com/VANatHeritage/ServiceAreas).
 """
 from Helper import *
 sys.path.append(r'D:\git\ServiceAreas')
@@ -39,7 +39,7 @@ def main():
    # Input features
    if yr == '2006':
       accFeat0 = r'F:\David\projects\vulnerability_model\vars\travel_time\UrbanCores2000\UrbanCores2000.shp'
-   elif yr == "2019":
+   elif yr == '2019':
       accFeat0 = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\UrbanCores2010_method3'
    # Output geodatabase
    outGDB = r'C:\David\proc\urbanCores' + yr + '_travelTime.gdb'

@@ -9,9 +9,9 @@ Summary:
 A library of functions for processing National Land Cover Database data
 
 Usage Notes:
-'year' is a standard variable that functions as a suffix for the file(s) to create. Use the full year (e.g. 2006)
-here for single-year variables, and for multi-year variables, use the last 2 digits of the two years separated by '_'
-(e.g. 06_16 for 2006/2016).
+'year' is a standard string variable that functions as a suffix for the file(s) to create. Use the full year (e.g.
+'2006') here for single-year variables, and for multi-year variables, use the last 2 digits of the two years separated
+by '_' (e.g. '06_16' for 2006/2016).
 """
 from Helper import *
 
@@ -324,7 +324,7 @@ def main():
       ImpFocal(imp, ngh, y)
 
    # Standard kernels
-   # Did not use Annulus:
+   # Considered, but did not use Annulus:
       # [NbrAnnulus(1, 10), 'imp_ann1_10'], [NbrAnnulus(10, 20), 'imp_ann10_20'], [NbrAnnulus(20, 30), 'imp_ann20_30'],
       # [NbrAnnulus(30, 40), 'imp_ann30_40'], [NbrAnnulus(40, 50), 'imp_ann40_50']
    neighborhoods = [[NbrIrregular(r'F:\David\projects\vulnerability_model\vars\nlcd_based\kernels\krect_3x3.txt'), 'kRect3']]

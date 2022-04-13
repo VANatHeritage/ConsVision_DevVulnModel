@@ -1,6 +1,5 @@
-# ignore all files except .gitignore
-# but apply this file here to keep folder structure
-
-*
-
+# ignore all but certain files
+/*
+/*/
+!kernels
 !.gitignore

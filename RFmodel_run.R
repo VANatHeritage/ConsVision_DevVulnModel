@@ -36,7 +36,7 @@ dir.create(proj.o, showWarnings = F)
 
 # Get full variable table.
 file.vartable <- paste0("inputs/vars/vars_DV.xlsx")
-vars <- read_excel(file.vartable) # %>% filter(use == 1)
+vars <- read_excel(file.vartable)
 if (sub.nm == "AllVars") {
   vars <- vars %>% filter(use == 1)
 } else {
