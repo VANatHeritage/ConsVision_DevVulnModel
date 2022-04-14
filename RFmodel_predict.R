@@ -3,12 +3,12 @@
 # This includes functions for the following processes:
 # - project: Create predictions raster
 # - pred.adjust: Adjust predictions raster using protection multiplier, development, and water
-# - indp.validate: Validate a model using new validation points data set
+# - indp.validate: Validate a model using validation points data set
 # 
 # Author: David Bucklin
 # Created: 2021-10-21
 # 
-# Usage: functions called at the end of model.R. Can be used independently as well.
+# Usage: The functions are called at the end of model.R, but they can be used independently in this script as well.
 # Note: these functions include datasets with fixed paths/names; would need to adjust to run in a new environment.
 
 setwd("D:/git/ConsVision_DevVulnModel")
@@ -98,7 +98,7 @@ pred.adjust <- function(proj.mod, year) {
 
 indp.validate <- function(proj.mod) {
   
-  # for output validation samples / grids
+  # for output validation samples
   out.gdb <- 'outputs/samples_validation.gdb'
   
   # load model
@@ -187,7 +187,7 @@ indp.validate <- function(proj.mod) {
     write.csv(df.ov[,1:7], file=paste0(proj.o, "/indpValid", pt, "_stats.csv"), row.names = F)
     
     # Output CV points to GDB
-    arc.write(paste0("outputs/samples_validation.gdb/", proj.mod, "_indpValid", pt, "_pts"), v1, overwrite=T)
+    arc.write(paste0(out.gdb, "/", proj.mod, "_indpValid", pt, "_pts"), v1, overwrite=T)
   }
   
   # combined P-R curve (with CV)

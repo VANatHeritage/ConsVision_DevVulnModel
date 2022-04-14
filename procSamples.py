@@ -97,14 +97,15 @@ def makeStrataFeat(inFeat, outFeat, inBnd, trainPercentage=50):
    return outFeat
 
 
-def makeSamps(devChg, sampMask, strataFeat, outTrain, outValidation):
+def makeSamps(devChg, sampMask, strataFeat, outTrain, outValidation, sepDist="0.5 Miles"):
    """
    Create training and validation point samples.
    :param devChg: Development change status raster
-   :param sampMask: Sampling mask (raster)
+   :param sampMask: Sampling mask raster
    :param strataFeat: Strata feature class
    :param outTrain: output training points feature class
    :param outValidation: output validation points feature class
+   :param sepDist: minimum separation distance between samples of the same class
    :return: [outTrain, outValidation]
    """
    print("Masking development change to sampling mask...")
@@ -116,14 +117,14 @@ def makeSamps(devChg, sampMask, strataFeat, outTrain, outValidation):
    # Make new-development points
    arcpy.RasterToPolygon_conversion('tmp_dev', 'tmp_dev_polys', "NO_SIMPLIFY", "Value", "SINGLE_OUTER_PART")
    lyr = arcpy.MakeFeatureLayer_management('tmp_dev_polys', where_clause="Shape_Area >= 8100")
-   arcpy.CreateRandomPoints_management(arcpy.env.workspace, "tmp_DevPts", lyr, "0 0 250 250", 3, "0.5 Miles", "POINT")
+   arcpy.CreateRandomPoints_management(arcpy.env.workspace, "tmp_DevPts", lyr, "0 0 250 250", 3, sepDist, "POINT")
    del lyr
-   arcpy.DeleteIdentical_management("tmp_DevPts", "Shape", "0.5 Miles")
+   arcpy.DeleteIdentical_management("tmp_DevPts", "Shape", sepDist)
    arcpy.CalculateField_management('tmp_DevPts', 'DevStatus', '1', field_type="SHORT")
 
    print("Making points for not-developed class...")
    arcpy.CreateRandomPoints_management(arcpy.env.workspace, "tmp_NoDevPts", strataFeat,
-                                       "0 0 250 250", 10, "0.5 Miles", "POINT")
+                                       "0 0 250 250", 10, sepDist, "POINT")
    arcpy.sa.ExtractMultiValuesToPoints('tmp_NoDevPts', [dc])
    # Remove points not falling in DevChg = 0 areas.
    lyr = arcpy.MakeFeatureLayer_management('tmp_NoDevPts')
@@ -131,7 +132,7 @@ def makeSamps(devChg, sampMask, strataFeat, outTrain, outValidation):
    arcpy.DeleteFeatures_management(lyr)
    del lyr
    # Thin points
-   arcpy.DeleteIdentical_management('tmp_NoDevPts', "Shape", "0.5 Miles")
+   arcpy.DeleteIdentical_management('tmp_NoDevPts', "Shape", sepDist)
    arcpy.CalculateField_management('tmp_NoDevPts', 'DevStatus', '0', field_type="SHORT")
 
    print("Creating `" + outTrain + "` and `" + outValidation + "` datasets...")
@@ -239,9 +240,6 @@ def main():
    ## 3. Generate sample points
    # NOTE: Training/Validation points for the 2022 model were developed manually in ArcGIS Pro.
    # The functions used in this step were added later to replicate the process used.
-   # Links to the feature services used in the 2022 model:
-   # Training points: https://arcg.is/1XuOWv
-   # Validation points: https://arcg.is/1TmvDC1
    chg_yrs = ['06', '16']
    devChg = outFold + os.sep + 'DevChg' + chg_yrs[0] + '_' + chg_yrs[1] + '.tif'
    sampMask = outFold + os.sep + 'sampMask_20' + chg_yrs[0] + '.tif'

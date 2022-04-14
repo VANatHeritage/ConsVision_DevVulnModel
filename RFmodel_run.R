@@ -251,7 +251,8 @@ cv <- snow::parLapply(cl, x = ls.gr, fun = function(x) {
     aucroc <- performance(p.rocr, "auc")@y.values[[1]]
     df0$roc_auc <- aucroc
     
-    # calculate grid-specific threshold from test data (DEPRECATED: threshold-based statistics not used.)
+    # calculate grid-specific threshold from test data
+    # (NOTE: threshold-based statistics were not used in model comparisons)
     ot <- optim.thresh(d.te$y, d.te$pred)
     gt <- ot$`max.sensitivity+specificity`[1]
     df0$thresh <- gt
@@ -282,7 +283,6 @@ opt.thresh <- optim.thresh(df.cv.full$y, df.cv.full$pred)
 thresh <- opt.thresh$`max.sensitivity+specificity`[1]
 
 # CV AUCs
-# first sub-sample test samples
 p.rocr <- prediction(df.cv.full$pred, df.cv.full$y)
 aucpr <- performance(p.rocr, "aucpr")@y.values[[1]]
 print(aucpr)

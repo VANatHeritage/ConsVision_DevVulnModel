@@ -14,7 +14,6 @@ some of the code may need adjusting.
 DATA NOTE:  To cover the 50-mile processing buffer around Virginia, download data for the following states:
 DE, DC, KY, MD, NC, PA, TN, VA, WV
 
-TODO: Do these impervious surface rasters have any NoData cells (e.g. for water?)
 TODO: Linear blocks around roads are not meeting shape index criteria in many cases for 2010. This results in
  exclusion of blocks from cores, since it breaks up contiguous blocks, and if contiguous blocks are not 1 sq mile,
  they can get excluded in fillCores, even if across a highway from a large core section. (This could be altered by
@@ -119,6 +118,7 @@ def PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Year, out_Tracts=None):
    if 'IMPERV20_MEAN' not in bnames:
       printMsg('Calculating proportion with 20% or greater imperviousness...')
       in_Imperv20 = scratchGDB + os.sep + 'tmp_imp20'
+      # NLCD Impervious rasters use 127 as a NoData value, which is why 'Value <= 100' is included below.
       with arcpy.EnvManager(extent=in_Blocks, cellSize=in_Imperv, snapRaster=in_Imperv,
                             outputCoordinateSystem=in_Imperv):
          arcpy.sa.Con(in_Imperv, 1, 0, 'Value >= 20 AND Value <= 100').save(in_Imperv20)
@@ -296,7 +296,7 @@ def main():
    # # End of variable input
    #
    # # Specify function(s) to run below
-   # PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Year, out_Tracts)   # Note: removed in_Imperv20, now generated in-function
+   # PrepBlocks(in_Blocks, in_PopTab, in_Imperv, in_Year, out_Tracts)   # DB Note: removed in_Imperv20, now generated in-function
    # MakeUrbanCores(in_Blocks, out_Cores3)
    # CategorizeCores(in_Cores)
 
@@ -306,7 +306,8 @@ def main():
    in_Blocks = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\CensusBlocks2010_70mile'
    in_PopTab = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\CensusBlocks2010_Pop'
    # Uses the full-extent impervious raster, since the processing boundary is beyond the 50-mile version.
-   # The 2016 land cover was used for cores eventually used, since 2019 was not out at that point.
+   # Note: data for 2019 NLCD is shown below, but NLCD 2016 was used for the 2022 edition vulnerablity model cores,
+   # since 2019 was not yet released when the cores were developed.
    in_Imperv = r'F:\David\GIS_data\NLCD\nlcd_2019_impervious_l48_20210604\nlcd_2019_impervious_l48_20210604.img'
    in_Year = 2010
    out_Cores = r'F:\David\GIS_data\NHGIS\blocks_pop_2010\CensusBlocks2010.gdb\UrbanCores2010_method3_w2019imp'
