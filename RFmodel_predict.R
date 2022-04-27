@@ -9,7 +9,7 @@
 # Created: 2021-10-21
 # 
 # Usage: The functions are called at the end of model.R, but they can be used independently in this script as well.
-# Note: these functions include datasets with fixed paths/names; would need to adjust to run in a new environment.
+# Functions use input and output datasets with fixed paths/names; would need to adjust to run in a new environment.
 
 setwd("D:/git/ConsVision_DevVulnModel")
 library(sf)
@@ -91,7 +91,7 @@ pred.adjust <- function(proj.mod, year) {
   r.pred2 <- mask(r.pred2, wat.mask)
   
   message('Setting already-developed areas to 101...')
-  r.pred.mask <- raster::mask(r.pred2, dev.mask, updatevalue=101, filename = paste0(out.mod, "_final2.tif"), overwrite = T, datatype = 'INT2S')
+  r.pred.mask <- raster::mask(r.pred2, dev.mask, updatevalue=101, filename = paste0(out.mod, "_final.tif"), overwrite = T, datatype = 'INT2S')
   return(r.pred.mask)
 }
 
@@ -112,18 +112,18 @@ indp.validate <- function(proj.mod) {
   vars <- vars[vars$varname %in% varnames,]
   
   # Validate model prediction with 2016->2019 change data.
+  if (!exists("training.points")) training.points <- proj  # proj is the old name of object used
   validation.points <- gsub("TrainingPoints", "ValidationPoints", training.points)
   v1 <- arc.data2sf(arc.select(arc.open(paste0("inputs/samples/samples.gdb/", validation.points))))
   v1$y <- v1$DevStatus
   
   # protection multiplier
   pmult <- raster(paste0('inputs/masks/conslands_pmultBMI_2006.tif'))
+  st_crs(v1) <- st_crs(pmult)
   
   # prediction rasters
   pred.rast.raw <- raster(paste0(proj.o, "/", proj.mod, "_2006.tif"))
   pred.rast.adj <- pred.rast.raw * pmult
-  # Below is the final model. It is equivalent, but has additional adjustments (rounded, water, already-developed). Not using.
-  # pred.rast.adj <- raster(paste0(proj.o, "/", proj.mod, "_2006_final2.tif")) 
   
   for (pt in c("Raw", "ProtAdj")) {
     if (pt == "Raw") pred.rast <- pred.rast.raw else pred.rast <- pred.rast.adj
@@ -151,12 +151,15 @@ indp.validate <- function(proj.mod) {
     print(aucroc)
     
     # P-R curves
+    if (pt == "ProtAdj") r.text <- "Protection-adjusted model value" else r.text <- "Model value"
     perf <- performance(p.rocr, "prec", "rec")
-    perf
-    png(paste0(proj.o, "/", "indpValid", pt, "_prCurve_BIG.png"), width = 720, height = 720, pointsize = 18)
-    plot(perf, colorize=TRUE, ylim=c(0,1), main = paste0('Precision-Recall curve; AUC(PRC) = ', round(aucpr, 3)), cex.main = 1.5, cex.lab=1.2)
+    png(paste0(proj.o, "/", "indpValid", pt, "_prCurve.png"), width = 800, height = 720, pointsize = 18)
+    par(mar = c(4, 4, 4, 6))
+    plot(perf, colorize=TRUE, ylim=c(0,1), main = paste0('Precision-Recall curve; AUC(PRC) = ', round(aucpr, 3)), 
+         cex.main = 1.5, cex.lab=1.2)
     baseline <- sum(v1$y==1) / nrow(v1)
     lines(x=c(0, 1), y = c(baseline, baseline), lty="dashed")
+    mtext(r.text, side=4, padj=4, cex = 1)
     plot(perf, colorize=TRUE, add = T, lwd = 3)
     dev.off()
     
@@ -167,9 +170,11 @@ indp.validate <- function(proj.mod) {
     
     # ROC curves
     perf <- performance(p.rocr, "tpr", "fpr")
-    png(paste0(proj.o, "/", "indpValid", pt, "_rocCurve_BIG.png"), width = 720, height = 720, pointsize = 18)
+    png(paste0(proj.o, "/", "indpValid", pt, "_rocCurve.png"), width = 800, height = 720, pointsize = 18)
+    par(mar = c(4, 4, 4, 6))
     plot(perf, colorize=TRUE, ylim = c(0, 1), main = paste0('ROC curve; AUC(ROC) = ', round(aucroc, 3)), cex.main = 1.5, cex.lab=1.2)
     lines(x=c(0, 1), y = c(0, 1), lty="dashed")
+    mtext(r.text, side=4, padj=4, cex = 1)
     plot(perf, colorize=TRUE, add = T, lwd = 3)
     dev.off()
     
