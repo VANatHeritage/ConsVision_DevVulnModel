@@ -5,10 +5,10 @@ Creator: David N. Bucklin
 Creation Date: 2019-09-11
 
 Summary:
-Used to process NLCD impervious descriptor for the vulnerabilty model. This includes creating a reclassified road raster
-assigning road speeds, and creating cost surfaces, where both Limited access highways and local (all other roads) cost
-rasters are output. Euclidean distance to each road type (local, ramp, and highway) are also generated, to use as
-predictor variables.
+Used to develop Cost Surfaces and distance to road/ramp predictors from NLCD impervious descriptor (with Tiger-Line
+roads used as ancillary data). Outputs include a reclassified road raster assigning road speeds, and creating cost
+surfaces, where both Limited access highways and local (all other roads) cost rasters are output.
+Euclidean distance to each road type (local, ramp, and highway) are also generated, to use as predictor variables.
 
 Recent Tiger roads were used to define limited access highways and ramps. This information is only used to reclassify
 the impervious descriptor dataset (it does not "create" roads). This potentially could miss LAH/ramps from earlier time

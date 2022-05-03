@@ -9,6 +9,7 @@
 # Author: David Bucklin
 # Created: 2021-10-21
 
+setwd("D:/git/ConsVision_DevVulnModel")
 library(sf)
 library(randomForest)
 library(ROCR)
@@ -22,7 +23,6 @@ library(snow)
 library(arcgisbinding)
 library(dplyr)
 arc.check_product()
-setwd("D:/git/ConsVision_DevVulnModel")
 date <- gsub("-","",Sys.Date())
 
 # Specific name to add to model
