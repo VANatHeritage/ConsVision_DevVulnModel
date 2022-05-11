@@ -276,14 +276,15 @@ def EucDistNLCD(nlcd, classes, year, maxDist=None):
 def CostNLCD(nlcd, year):
 
    out = 'lc_cost_'
-   print('Making land cover cost raster `' + out + '`.')
+   print('Making land cover cost raster `' + out + year + '`.')
 
-   # Assign costs to remap value
+   # Assign development costs to land cover classes
    rcl = arcpy.sa.RemapValue([[11, 5], [21, 0], [22, 0], [23, 0], [24, 0], [31, 1], [41, 4], [42, 4], [43, 4],
-                              [52, 3], [71, 2], [81, 2], [82, 2], [90, 4], [95, 2]])
+                              [52, 3], [71, 2], [81, 2], [82, 2], [90, 4], [95, 4]])
    arcpy.sa.Reclassify(nlcd, 'Value', rcl, "NODATA").save(out + year)
-   print('Calculating focal statistic in 3-cell circle...')
-   arcpy.sa.FocalStatistics(out, NbrCircle(3, "CELL"), "MEAN").save(out + '3cell_' + year)
+
+   # print('Calculating focal statistic in 3-cell circle...')  # not using
+   # arcpy.sa.FocalStatistics(out, NbrCircle(3, "CELL"), "MEAN").save(out + '3cell_' + year)
    return out
 
 

@@ -383,13 +383,13 @@ for (p in 1:length(pPlots)) {
   png(file=paste0(ppdir, "/rank", p, "_", pl$varName, '.png'), width=500, height=600)
   
   # density plot
-  par(fig=c(0,1,0.6,1), new=TRUE)
+  par(fig=c(0,1,0.6,1)) #, new=TRUE)
   pres.dens <- density(d[d$y == 1, pl$varName])
   abs.dens <- density(d[d$y==0, pl$varName])
   xlim <- c(min(pl$x), quantile(d[,pl$varName][d$y == 1],probs = 0.99)[[1]])
   ylim <- c(0,max(c(abs.dens$y,pres.dens$y)))
   plot(pres.dens, 
-       xlim=xlim,  # uses %iles for class-1 values.
+       xlim=xlim,  # uses percentiles for class-1 values.
        ylim=ylim,
        main=NA,xlab=NA,ylab=NA, axes=FALSE, col="blue", lwd=3)
   lines(abs.dens, col="red", lwd=1.8)

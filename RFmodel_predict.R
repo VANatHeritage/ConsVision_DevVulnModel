@@ -98,6 +98,7 @@ pred.adjust <- function(proj.mod, year) {
 
 indp.validate <- function(proj.mod) {
   
+  message("Preparing validation points and prediction rasters...")
   # for output validation samples
   out.gdb <- 'outputs/samples_validation.gdb'
   
@@ -127,7 +128,7 @@ indp.validate <- function(proj.mod) {
   
   for (pt in c("Raw", "ProtAdj")) {
     if (pt == "Raw") pred.rast <- pred.rast.raw else pred.rast <- pred.rast.adj
-    print(pt)
+    message(paste0('Validating ', pt, ' predictions...'))
     
     # Attach raster prediction values
     v1$pred <- extract(pred.rast, v1)
@@ -136,7 +137,6 @@ indp.validate <- function(proj.mod) {
     df.1 <- data.frame(class = 1, t(quantile(v1$pred[v1$y==1], c(0.01, 0.025, 0.05, 0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99))))
     df.0 <- data.frame(class = 0, t(quantile(v1$pred[v1$y==0], c(0.01, 0.025, 0.05, 0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99))))
     df.quant <- rbind(df.1, df.0)
-    df.quant
     write.csv(df.quant, paste0(proj.o, "/","indpValid", pt, "_quantiles.csv"), row.names = F)
     
     # Get final threshold from all point predictions
@@ -146,9 +146,9 @@ indp.validate <- function(proj.mod) {
     # Validation AUCs
     p.rocr <- prediction(v1$pred, v1$y)
     aucpr <- performance(p.rocr, "aucpr")@y.values[[1]]
-    print(aucpr)
+    print(paste0("AUC-PR: ", aucpr))
     aucroc <- performance(p.rocr, "auc")@y.values[[1]]
-    print(aucroc)
+    print(paste0("AUC-PR: ", aucroc))
     
     # P-R curves
     if (pt == "ProtAdj") r.text <- "Protection-adjusted model value" else r.text <- "Model value"
