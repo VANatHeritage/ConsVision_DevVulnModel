@@ -66,6 +66,14 @@ def garbagePickup(trashList):
    return
 
 
+def metadata_copy(template, target):
+   src = arcpy.metadata.Metadata(template)
+   tgt = arcpy.metadata.Metadata(target)
+   tgt.copy(src)
+   tgt.save()
+   return target
+
+
 def CleanFeatures(inFeats, outFeats):
    '''Repairs geometry, then explodes multipart polygons to prepare features for geoprocessing.'''
 

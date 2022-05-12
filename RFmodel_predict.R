@@ -18,6 +18,8 @@ library(raster)
 library(readxl)
 library(SDMTools)
 library(arcgisbinding)
+library(ROCR)
+library(ggplot2)
 arc.check_product()
 removeTmpFiles()
 
@@ -150,17 +152,21 @@ indp.validate <- function(proj.mod) {
     aucroc <- performance(p.rocr, "auc")@y.values[[1]]
     print(paste0("AUC-PR: ", aucroc))
     
+    # Color palette    
+    palf <- colorRampPalette(c(rgb(38,115,0,1, maxColorValue = 255), rgb(245,245,122,1, maxColorValue = 255), rgb(230,76,0,1, maxColorValue = 255)))
+    pal <- palf(256)
+    
     # P-R curves
-    if (pt == "ProtAdj") r.text <- "Protection-adjusted model value" else r.text <- "Model value"
+    if (pt == "ProtAdj") r.text <- "Protection-adjusted model value" else r.text <- "Model prediction value"
     perf <- performance(p.rocr, "prec", "rec")
     png(paste0(proj.o, "/", "indpValid", pt, "_prCurve.png"), width = 800, height = 720, pointsize = 18)
-    par(mar = c(4, 4, 4, 6))
-    plot(perf, colorize=TRUE, ylim=c(0,1), main = paste0('Precision-Recall curve; AUC(PRC) = ', round(aucpr, 3)), 
-         cex.main = 1.5, cex.lab=1.2)
+    par(mar = c(4, 4, 4, 6), cex.axis = 1.1, cex.lab=1.3, cex.main = 1.5)
+    plot(perf, colorize=TRUE, colorize.palette=pal, ylim=c(0,1), downsampling = 0.2,
+         main = paste0('Precision-Recall curve; AUC(PRC) = ', round(aucpr, 3)))
     baseline <- sum(v1$y==1) / nrow(v1)
     lines(x=c(0, 1), y = c(baseline, baseline), lty="dashed")
-    mtext(r.text, side=4, padj=4, cex = 1)
-    plot(perf, colorize=TRUE, add = T, lwd = 3)
+    mtext(r.text, side=4, padj=4, cex = 1.3)
+    plot(perf, colorize=TRUE, colorize.palette=pal, add = T, lwd = 5)
     dev.off()
     
     if (pt == "Raw") {
@@ -171,11 +177,11 @@ indp.validate <- function(proj.mod) {
     # ROC curves
     perf <- performance(p.rocr, "tpr", "fpr")
     png(paste0(proj.o, "/", "indpValid", pt, "_rocCurve.png"), width = 800, height = 720, pointsize = 18)
-    par(mar = c(4, 4, 4, 6))
-    plot(perf, colorize=TRUE, ylim = c(0, 1), main = paste0('ROC curve; AUC(ROC) = ', round(aucroc, 3)), cex.main = 1.5, cex.lab=1.2)
+    par(mar = c(4, 4, 4, 6), cex.axis = 1.1, cex.lab=1.3, cex.main = 1.5)
+    plot(perf, colorize=T, colorize.palette=pal, ylim = c(0, 1), main = paste0('ROC curve; AUC(ROC) = ', round(aucroc, 3)))
     lines(x=c(0, 1), y = c(0, 1), lty="dashed")
-    mtext(r.text, side=4, padj=4, cex = 1)
-    plot(perf, colorize=TRUE, add = T, lwd = 3)
+    mtext(r.text, side=4, padj=4, cex = 1.3)
+    plot(perf, colorize=T, colorize.palette=pal, add = T, lwd = 5)
     dev.off()
     
     if (pt == "Raw") {
@@ -217,7 +223,7 @@ indp.validate <- function(proj.mod) {
 
 # Example workflow
 
-# proj.mod <- "DevVuln_AllVars_20211104"
+# proj.mod <- "DevVuln_AllVars_20220510"
 # year <- '2006'
 # raw <- project(proj.mod, year)
 # adj <- pred.adjust(proj.mod, year)

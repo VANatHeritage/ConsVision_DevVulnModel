@@ -289,38 +289,50 @@ print(aucpr)
 aucroc <- performance(p.rocr, "auc")@y.values[[1]]
 print(aucroc)
 
+# Color palette    
+palf <- colorRampPalette(c(rgb(38,115,0,1, maxColorValue = 255), rgb(245,245,122,1, maxColorValue = 255), rgb(230,76,0,1, maxColorValue = 255)))
+pal <- palf(256)
+r.text <- "Prediction Threshold Value"
+
 # P-R curves
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4349800/
 # The baseline of PRC is determined by the ratio of positives (P) and negatives (N) as y = P / (P + N)
 perf <- performance(p.rocr, "prec", "rec")
-png(paste0(proj.o, "/", "crossValid_prCurve.png"), width = 720, height = 720)
-plot(perf, colorize=TRUE, ylim=c(0,1), main = paste0('Precision-Recall curve; AUC(PRC) = ', round(aucpr, 3)), cex.main = 1.5, cex.lab=1.2)
-baseline <- sum(df.cv.full$y==1) / nrow(df.cv.full)
-lines(x=c(0, 1), y = c(baseline, baseline), lty="dashed")
-# Fold PR curve(s)
+png(paste0(proj.o, "/", "crossValid_prCurve.png"), width = 800, height = 720, pointsize = 18)
+par(mar = c(4, 4, 4, 6), cex.axis = 1.1, cex.lab=1.3, cex.main = 1.5)
+plot(perf, colorize=T, colorize.palette=pal, 
+     colorkey = T, colorkey.pos = "right", colorkey.relwidth = 0.5,
+     ylim=c(0,1), main = paste0('Precision-Recall curve; AUC(PRC) = ', round(aucpr, 3)))
 for (i in 1:10) {
   pi <- prediction(df.cv.full$pred[df.cv.full$foldid==i], df.cv.full$y[df.cv.full$foldid==i])
   pip <- performance(pi, "prec", "rec")
   plot(pip, col="grey70", add = T, lwd = 1.5)
 }
-plot(perf, colorize=TRUE, add = T, lwd = 3)
-legend(0.7, 0.99, legend=c("CV folds", "Overall CV"),
-       col=c("grey70", "black"), lwd=c(1:5, 3), cex=1.5)
+baseline <- sum(df.cv.full$y==1) / nrow(df.cv.full)
+lines(x=c(0, 1), y = c(baseline, baseline), lty="dashed")
+mtext(r.text, side=4, padj=4, cex = 1.3)
+plot(perf, colorize=TRUE, colorize.palette=pal, print.cutoffs.at = 0.5, add = T, lwd = 5)
+legend(0.6, 0.98, legend=c("10% Sample Curves", "Composite Curve"),
+       col=c("grey70", palf(1)), lwd=c(1.5, 4), cex=1.1)
 dev.off()
 
 # ROC curves
 perf <- performance(p.rocr, "tpr", "fpr")
-png(paste0(proj.o, "/", "crossValid_rocCurve.png"), width = 720, height = 720)
-plot(perf, colorize=TRUE, ylim = c(0, 1), main = paste0('ROC curve; AUC(ROC) = ', round(aucroc, 3)), cex.main = 1.5, cex.lab=1.2)
-# Fold ROC curve(s)
+png(paste0(proj.o, "/", "crossValid_rocCurve.png"), width = 800, height = 720, pointsize = 18)
+par(mar = c(4, 4, 4, 6), cex.axis = 1.1, cex.lab=1.3, cex.main = 1.5)
+plot(perf, colorize=T, colorize.palette=pal, ylim = c(0, 1), 
+     colorkey = T, colorkey.pos = "right", colorkey.relwidth = 0.5,
+     main = paste0('ROC curve; AUC(ROC) = ', round(aucroc, 3)))
 for (i in 1:10) {
   pi <- prediction(df.cv.full$pred[df.cv.full$foldid==i], df.cv.full$y[df.cv.full$foldid==i])
   pip <- performance(pi, "tpr", "fpr")
   plot(pip, col="grey70", add = T, lwd = 1.5)
 }
-plot(perf, colorize=TRUE, add = T, lwd = 3)
-legend(0.7, 0.25, legend=c("CV folds", "Overall CV"),
-       col=c("grey70", "black"), lwd=c(1:5, 3), cex=1.5)
+lines(x=c(0, 1), y = c(0, 1), lty="dashed")
+mtext(r.text, side=4, padj=4, cex = 1.3)
+plot(perf, colorize=T, colorize.palette=pal, print.cutoffs.at = 0.5, add = T, lwd = 5)
+legend(0.5, 0.2, legend=c("10% Sample Curves", "Composite Curve"),
+       col=c("grey70", palf(1)), lwd=c(1.5, 4), cex=1.1)
 dev.off()
 
 # write final stats CSV
