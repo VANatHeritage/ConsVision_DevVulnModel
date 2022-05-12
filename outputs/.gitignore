@@ -2,5 +2,5 @@
 # but apply this file here to keep folder structure
 
 *
-
+!Report_Tables_Figures.R
 !.gitignore
