@@ -15,20 +15,12 @@ import numpy
 import regex as re
 import pandas
 from datetime import datetime as datetime
-
-try:
-   arcpy
-   print("Arcpy is already loaded")
-except:
-   print("Initiating arcpy, which takes longer than it should...")
-   import arcpy
-
+import arcpy
 arcpy.CheckOutExtension('Spatial')
-import arcpy.sa
+from arcpy.sa import *
 
 # Set overwrite option so that existing data may be overwritten
 arcpy.env.overwriteOutput = True
-from arcpy.sa import *
 
 
 def getScratchMsg(scratchGDB):
@@ -447,7 +439,7 @@ def ProjectRasterToMatch(in_Raster, in_Template, out_Raster, resample_Type="NEAR
       - MAJORITY
    '''
 
-   srRast = arcpy.Describe(in_Rast).spatialReference
+   srRast = arcpy.Describe(in_Raster).spatialReference
    srTemplate = arcpy.Describe(in_Template).spatialReference
    arcpy.env.snapRaster = in_Template
 
@@ -463,7 +455,7 @@ def ProjectRasterToMatch(in_Raster, in_Template, out_Raster, resample_Type="NEAR
       else:
          transList = arcpy.ListTransformations(srRast, srTemplate)
          geoTrans = transList[0]
-      ProjectRaster_management(in_Raster, out_Raster, in_Template, resample_Type, "", geoTrans)
+      arcpy.ProjectRaster_management(in_Raster, out_Raster, in_Template, resample_Type, "", geoTrans)
    return out_Raster
 
 

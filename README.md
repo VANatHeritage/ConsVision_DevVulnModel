@@ -29,4 +29,9 @@ The most recent edition of the model was released in 2022. For more information,
 ### Random forest model
 
 - **RFModel_run.R**: creates a new random forest model with specified samples. Includes entire process: variable selection, cross-validation, final model with partial plots
-- **RFModel_predict.R**: functions to run post-model processes for the development vulnerability random forest model, including creating predictions raster(s), adjusting predictions raster using protection multiplier, development, and water, and validating a model using validation points data set. These functions are called at the end of **RFModel_run.R**.
+- **RFModel_predict.R**: functions to run post-model processes for the development vulnerability random forest model, including creating prediction raster(s), adjusting prediction raster using protection multiplier, development, and water, and validating predictions using validation points data set. These functions are called at the end of **RFModel_run.R**.
+
+### Post-processing
+
+- **finalizeModelProducts.py**: copies raster datasets for the selected model (raw and final scores) to geodatabase and TIF rasters, updating their metadata from template files.
+- **outputs/Report_Tables_Figures.R**: generates tables and figures for final technical report. Includes predictor variable table and figures for variable importance, partial plots, and PRC/ROC curves for cross-validation and independent tests.

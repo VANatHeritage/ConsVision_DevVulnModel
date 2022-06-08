@@ -40,24 +40,25 @@
 # ----------------------------------------------------------------------------------------
 
 # Import required modules
-import ftplib # needed to connect to the FTP server and download files
-import socket # needed to test FTP connection (or something; I dunno)
-import csv # needed to read/write CSV files
-import os # provides access to operating system funtionality such as file and directory paths
-import sys # provides access to Python system functions
-import traceback # used for error handling
-import gc # garbage collection
-import datetime # for time stamps
+import arcpy
+import ftplib  # needed to connect to the FTP server and download files
+import socket  # needed to test FTP connection (or something; I dunno)
+import csv  # needed to read/write CSV files
+import os  # provides access to operating system functionality such as file and directory paths
+import sys  # provides access to Python system functions
+import traceback  # used for error handling
+import gc  # garbage collection
+import datetime  # for time stamps
 from datetime import datetime
 
 # Script arguments to be input by user
-in_tab = arcpy.GetParameterAsText(0) # Table containing unique ID field for the files to retrieve
-in_fld = arcpy.GetParameterAsText(1) # Field containing the unique ID
-pre = arcpy.GetParameterAsText(2) # Filename prefix; optional
-suf = arcpy.GetParameterAsText(3) # Filename suffix; optional
-out_dir = arcpy.GetParameterAsText(4) # Output directory to store downloaded files
-ftpHOST = arcpy.GetParameterAsText(5) # FTP site
-ftpDIR = arcpy.GetParameterAsText(6) # FTP directory
+in_tab = arcpy.GetParameterAsText(0)  # Table containing unique ID field for the files to retrieve
+in_fld = arcpy.GetParameterAsText(1)  # Field containing the unique ID
+pre = arcpy.GetParameterAsText(2)  # Filename prefix; optional
+suf = arcpy.GetParameterAsText(3)  # Filename suffix; optional
+out_dir = arcpy.GetParameterAsText(4)  # Output directory to store downloaded files
+ftpHOST = arcpy.GetParameterAsText(5)  # FTP site
+ftpDIR = arcpy.GetParameterAsText(6)  # FTP directory
 
 # Derived variables
 if not pre:
@@ -68,11 +69,11 @@ if not suf:
 # Create and open a log file.
 # If this log file already exists, it will be overwritten.  If it does not exist, it will be created.
 ProcLogFile = out_dir + os.sep + 'README.txt'
-Log = open(ProcLogFile, 'w+') 
+Log = open(ProcLogFile, 'w+')
 FORMAT = '%Y-%m-%d %H:%M:%S'
 timestamp = datetime.now().strftime(FORMAT)
 Log.write("Process logging started %s" % timestamp)
-                                    
+
 try:
    ftp = ftplib.FTP(ftpHOST)
    arcpy.AddMessage("CONNECTED TO HOST '%s'" % ftpHOST)
@@ -87,18 +88,18 @@ except ftplib.error_perm:
    arcpy.AddError('Error: cannot login annonymously')
    Log.write('Error: cannot login annonymously \n')
    ftp.quit()
-print 'Logged in'
+print('Logged in')
 
 try:
-    ftp.cwd(ftpDIR)
+   ftp.cwd(ftpDIR)
 except ftplib.error_perm:
-   arcpy.AddError('Error: cannot CD to "%s"' %ftpDIR)
-   Log.write ('Error: cannot CD to "%s" \n' %ftpDIR)
+   arcpy.AddError('Error: cannot CD to "%s"' % ftpDIR)
+   Log.write('Error: cannot CD to "%s" \n' % ftpDIR)
    ftp.quit()
-print 'Changed to "%s" folder' %ftpDIR
+print('Changed to "%s" folder' % ftpDIR)
 
-nhdList = list() # List to hold NHD filenames
-ProcList = list() # List to hold processing results
+nhdList = list()  # List to hold NHD filenames
+ProcList = list()  # List to hold processing results
 
 # Make a list of the files to download, from the input table                                     
 try:
@@ -110,13 +111,13 @@ except:
    arcpy.AddError('Unable to parse input table.  Exiting...')
    Log.write('Unable to parse input table.  Exiting...')
    quit()
-         
+
 # Download the files and save to the output directory, while keeping track of success/failure
 for fileName in nhdList:
    try:
       arcpy.AddMessage('Downloading %s ...' % fileName)
       with open(os.path.join(out_dir, fileName), 'wb') as local_file:
-         ftp.retrbinary('RETR '+ fileName, local_file.write)
+         ftp.retrbinary('RETR ' + fileName, local_file.write)
       ProcList.append('Successfully downloaded %s' % fileName)
    except:
       arcpy.AddWarning('Failed to download %s ...' % fileName)
@@ -125,8 +126,7 @@ for fileName in nhdList:
 # Write download results to log.
 for item in ProcList:
    Log.write("%s\n" % item)
- 
-timestamp = datetime.now().strftime(FORMAT)
-Log.write("\nProcess logging ended %s" % timestamp)   
-Log.close()
 
+timestamp = datetime.now().strftime(FORMAT)
+Log.write("\nProcess logging ended %s" % timestamp)
+Log.close()
