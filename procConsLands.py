@@ -164,12 +164,12 @@ def main():
       arcpy.sa.Con(arcpy.sa.IsNull('bmirast'), 6, 'bmirast').save(outRast)  # BMI values are between 1-5
 
       # Protection multiplier
-      # deprecated: did not use
-      # Option 1: Protection multiplier, based on LPS and BMI)
-      # outRast = r'D:\git\ConsVision_DevVulnModel\inputs\masks\conslands_pmult_' + year + '.tif'
-      # protMult('conslands_bmi_' + year, 'conslands_lps_' + year, outRast)
+      # 1: Protection multiplier, based on LPS and BMI); this was tried as a predictor variable, but ultimately
+      # only was used as an input for the sampling mask.
+      outRast = r'D:\git\ConsVision_DevVulnModel\inputs\masks\conslands_pmult_' + year + '.tif'
+      protMult('conslands_bmi_' + year, 'conslands_lps_' + year, outRast)
 
-      # Option 2. BMI-only multiplier (based on BMI only)
+      # 2. BMI-only multiplier (based on BMI only). This was used to adjust raw model values.
       outRast = r'D:\git\ConsVision_DevVulnModel\inputs\masks\conslands_pmultBMI_' + year + '.tif'
       protMultBMI('conslands_bmi_' + year, outRast)
 

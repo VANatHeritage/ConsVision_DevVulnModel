@@ -12,7 +12,7 @@ library(ROCR)
 library(ggplot2)
 library(inlmisc)
 arc.check_product()
-setwd(".")
+setwd("D:/git/ConsVision_DevVulnModel/outputs")
 # set selected model here.
 final.model <- "DevVuln_AllVars_20220510"
 
@@ -95,7 +95,7 @@ file.vartable <- paste0("../inputs/vars/vars_DV.xlsx")
 vars.master <- read_excel(file.vartable)
 
 # Load model data
-m <- paste0("D:/git/ConsVision_DevVulnModel/outputs/", final.model, '/', final.model, ".Rdata")
+m <- paste0(final.model, '/', final.model, ".Rdata")
 load(m)
 
 ## Variable Importance
@@ -103,8 +103,6 @@ imp <- left_join(imp.final, vars.master, by=c("var" = "varname"))
 p <- ggplot(imp) + geom_bar(aes(x=reorder(short_description, MeanDecreaseAccuracy), y = MeanDecreaseAccuracy), stat = "identity", position = "dodge") +
   theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = -0.1), text = element_text(size = 10)) + 
   coord_flip() + xlab(NULL) + ylab("\nMean Decrease in Accuracy")
-# ggtitle("Predictor variable importance")
-# ggtitle('Variable importance: final model', subtitle = paste0('Model OOB AUC(PRC): ', round(aucpr, 3)))
 p
 ggsave(filename = paste0(pdir, "/", "finalModel_varImp.png"), p, height = 4.5, width = 7.5)
 
@@ -161,14 +159,14 @@ r.text <- "Prediction Threshold Value"
 palf <- colorRampPalette(c(rgb(38,115,0,1, maxColorValue = 255), rgb(245,245,122,1, maxColorValue = 255), rgb(230,76,0,1, maxColorValue = 255)))
 pal <- palf(256)
 # # Points to add to curves
-pt <- seq(0, 1, 0.1) # , 0.5, 0.75)
+pt <- 0.5  # seq(0, 1, 0.1)
 
 # P-R curve
 perf <- performance(p.rocr.adj, "prec", "rec")
 # minx <- 0
-png(paste0(pdir, "/", "crossValid_prCurve.png"), width = 5, height = 5, units = "in", res = 240) # width = 800, height = 800, pointsize = 24)
+png(paste0(pdir, "/", "crossValid_prCurve.png"), width = 5, height = 5, units = "in", res = 240)
 par(mar = c(4.1, 4, 1, 1), cex.axis = 1.1, cex.lab=1.1, cex.main = 1.5) # xpd = F
-plot(perf, colorize=T, colorize.palette=pal, colorkey = F, ylim=c(0,1)) # , xlim = c(minx, 1), xaxs = 'i')
+plot(perf, colorize=T, colorize.palette=pal, colorkey = F, ylim=c(0,1)) # xlim = c(minx, 1), xaxs = 'i')
 for (i in 1:10) {
   pi <- prediction(df.cv.full$pred[df.cv.full$foldid==i], df.cv.full$y[df.cv.full$foldid==i])
   pip <- performance(pi, "prec", "rec")
@@ -186,7 +184,7 @@ dev.off()
 
 # ROC curve
 perf <- performance(p.rocr, "tpr", "fpr")
-png(paste0(pdir, "/", "crossValid_rocCurve.png"), width = 5, height = 5, units = "in", res = 240) # , width = 800, height = 800, pointsize = 24,)
+png(paste0(pdir, "/", "crossValid_rocCurve.png"), width = 5, height = 5, units = "in", res = 240)
 par(mar = c(4.1, 4, 1, 1), cex.axis = 1.1, cex.lab=1.1, cex.main = 1.5)
 plot(perf, colorize=T, colorize.palette=pal, ylim = c(0, 1), 
      colorkey = F)
@@ -221,14 +219,11 @@ p.rocr.adj <- prediction(v1[v1$pred <= p10,]$pred, v1[v1$pred <= p10,]$y)
 perf <- performance(p.rocr.adj, "prec", "rec")
 png(paste0(pdir, "/", "indpTest_prCurve.png"), width = 5, height = 5, units = "in", res = 240)
 par(mar = c(4.1, 4, 1, 1), cex.axis = 1.1, cex.lab=1.1, cex.main = 1.5)
-plot(perf, colorize=T, colorize.palette=pal, colorkey = F, 
-     ylim=c(0,1)) # , xlim = c(minx, 1), xaxs = 'i')
+plot(perf, colorize=T, colorize.palette=pal, colorkey = F, ylim=c(0, 1)) # , xlim = c(minx, 1), xaxs = 'i')
 baseline <- sum(v1$y==1) / nrow(v1)
 lines(x=c(0, 1), y = c(baseline, baseline), lty="dashed")
 plot(perf, colorize=TRUE, colorize.palette=pal, add = T, lwd = 5)
 add_labeled_pts(perf, pt, off.x = -0.1, off.y = -0.05)
-# legend(x=0.05, y=0.3, legend=c("10% Sample Curves", "Composite Curve"),
-#        col=c("grey60", palf(1)), lwd=c(1.5, 4), cex=1, bty = "n")
 AddGradientLegend(seq(0, 1, 0.01), pal=palf, title = "Prediction \nThreshold Value", loc = "bottomleft", inset = c(0.8, 0.6), strip.dim = c(1.5, 5))
 text(0.15, 0.12, labels=paste0("AUC(PRC) = ", round(aucpr, 3)), adj=0, cex = 1)
 dev.off()
@@ -241,8 +236,6 @@ plot(perf, colorize=T, colorize.palette=pal, ylim = c(0, 1), colorkey = F)
 lines(x=c(0, 1), y = c(0, 1), lty="dashed")
 plot(perf, colorize=T, colorize.palette=pal, add = T, lwd = 5)
 add_labeled_pts(perf, pt)
-# legend(0.4, 0.3, legend=c("10% Sample Curves", "Composite Curve"),
-#        col=c("grey60", palf(1)), lwd=c(1.5, 4), cex=1, bty = "n")
 text(0.5, 0.12, labels=paste0("AUC(ROC) = ", round(aucroc, 3)), adj=0, cex = 1)
 AddGradientLegend(seq(0, 1, 0.01), pal=palf, title = "Prediction \nThreshold Value", loc = "bottomleft", inset = c(0.8, 0.3), strip.dim = c(1.5, 5))
 dev.off()
