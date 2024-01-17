@@ -204,8 +204,8 @@ def main():
    bnd = r'D:\git\ConsVision_DevVulnModel\ArcGIS\vulnmod.gdb\jurisbnd_lam_clipbound'
 
    # NLCD Land cover and impervious gdbs
-   lc_gdb = r'F:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_LandCover_albers.gdb'
-   imp_gdb = r'F:\David\GIS_data\NLCD\nlcd_2019\nlcd_2019ed_Impervious_albers.gdb'
+   lc_gdb = r'F:\David\GIS_data\NLCD\nlcd_2021\nlcd_2021ed_LandCover_albers.gdb'
+   imp_gdb = r'F:\David\GIS_data\NLCD\nlcd_2021\nlcd_2021ed_Impervious_albers.gdb'
 
    # Folder where predictor variable rasters are stored
    rastLoc = r'D:\git\ConsVision_DevVulnModel\inputs\vars'
@@ -262,17 +262,18 @@ def main():
    va_bnd = r'D:\git\ConsVision_DevVulnModel\ArcGIS\dev_vuln.gdb\VirginiaCounty_Dissolve'
    out_dir = r'D:\git\ConsVision_DevVulnModel\inputs\masks'
    years = ['2006', '2019']
+   years = ['2021']  # for updates
    # Water mask (used for setting water to NoData in adjusted model rasters)
    for y in years:
       out_rast = out_dir + os.sep + 'water_mask_' + y + '.tif'
       print(out_rast)
-      with arcpy.EnvManager(extent=va_bnd, mask=va_bnd):
+      with arcpy.EnvManager(mask=va_bnd):
          arcpy.sa.SetNull(lc_gdb + os.sep + 'lc_' + y, 1, 'Value = 11').save(out_rast)
    # Development masks (used for setting already-developed to 101 in adjusted model rasters)
    for y in years:
       out_rast = out_dir + os.sep + 'dev_mask_' + y + '.tif'
       print(out_rast)
-      with arcpy.EnvManager(extent=va_bnd, mask=va_bnd):
+      with arcpy.EnvManager(mask=va_bnd):
          arcpy.sa.SetNull(imp_gdb + os.sep + 'imperv_' + y, 1, 'Value > 0').save(out_rast)
 
    # clean up

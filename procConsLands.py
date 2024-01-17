@@ -133,17 +133,23 @@ def main():
    pad = r'F:\David\GIS_data\PAD\PAD_US2_1_GDB\PAD_US2_1.gdb\PADUS2_1Fee'
    bnd = r'F:\David\GIS_data\snap_template_data\VA_Buff50mi.shp'
 
-   # Current conservation lands
+   # Current conservation lands (as of model publishing)
    conslands_current = r'D:\biotics\bioticsdata_Sept2021.gdb\managed_areas'
 
    ## Process Conservation Lands for protection multiplier
-   for year in ['2006', 'current']:
-
-      # Load and subset conservation lands
-      if year != 'current':
-         inPolys0 = os.path.join(out_dir, 'conslands' + year + '.shp')
-      else:
-         inPolys0 = conslands_current
+   # for year in ['2006', 'current']:
+   conslands_ls = [["2006", os.path.join(out_dir, 'conslands_2006.shp')], ["2016", os.path.join(out_dir, 'conslands_2016.shp')], 
+    ["current", conslands_current], ['2023', r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\ECS_Inputs_Jun2023.gdb\conslands']]
+   
+   for proc in conslands_ls:
+      year = proc[0]
+      inPolys0 = proc[1]
+      # Load conservation lands
+      # if year != 'current':
+      #    inPolys0 = os.path.join(out_dir, 'conslands' + year + '.shp')
+      # else:
+      #    inPolys0 = conslands_current
+      # Subset
       inPolys = arcpy.MakeFeatureLayer_management(inPolys0, where_clause="BMI <> 'U'")  # U is excluded; rec'd by Dave Boyd
 
       # LPS

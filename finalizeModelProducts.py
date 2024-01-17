@@ -14,19 +14,27 @@ Make sure to archive old versions of rasters first. overwriteOuptut is set to Fa
 from Helper import *
 
 
-def finalizeModel(model, model_loc, year, boundary, out_gdb):
+def finalizeModel(model, model_loc, year, boundary, out_gdb, upd=None):
    print('Working on raw values for ' + year + '...')
-   rin = model_loc + os.sep + model + '_' + year + '.tif'
-   rout = out_gdb + os.sep + 'DevVuln_to' + str(int(year) + 10) + '_raw'
-   if arcpy.Exists(rout):
-      arcpy.Rename_management(rout, os.path.dirname(rout) + os.sep + 'x_' + os.path.basename(rout))
-   arcpy.sa.ExtractByMask(rin, boundary).save(rout)
-   # update metadata
-   md_templ = out_gdb + os.sep + 'template_' + os.path.basename(rout)
-   metadata_copy(md_templ, rout)
+   if upd is None:
+      rin = model_loc + os.sep + model + '_' + year + '.tif'
+      rout = out_gdb + os.sep + 'DevVuln_to' + str(int(year) + 10) + '_raw'
+      if arcpy.Exists(rout):
+         arcpy.Rename_management(rout, os.path.dirname(rout) + os.sep + 'x_' + os.path.basename(rout))
+      arcpy.sa.ExtractByMask(rin, boundary).save(rout)
+      # update metadata
+      md_templ = out_gdb + os.sep + 'template_' + os.path.basename(rout)
+      metadata_copy(md_templ, rout)
+   else:
+      print("Update only, skipping raw values.")
+   if upd is None:
+      rin = model_loc + os.sep + model + '_' + year + '_final.tif'
+      rout = out_gdb + os.sep + 'DevVuln_to' + str(int(year) + 10)
+   else:
+      print("Making updated final raster...")
+      rin = model_loc + os.sep + model + '_' + year + '_final_' + upd + '.tif'
+      rout = out_gdb + os.sep + 'DevVuln_to' + str(int(year) + 10) + '_' + upd
    print('Working on final model values for ' + year + '...')
-   rin = model_loc + os.sep + model + '_' + year + '_final.tif'
-   rout = out_gdb + os.sep + 'DevVuln_to' + str(int(year) + 10)
    if arcpy.Exists(rout):
       arcpy.Rename_management(rout, os.path.dirname(rout) + os.sep + 'x_' + os.path.basename(rout))
    arcpy.sa.ExtractByMask(rin, boundary).save(rout)
@@ -94,6 +102,9 @@ def main():
    yrs = ['2006', '2019']
    for y in yrs:
       finalizeModel(model=in_model, model_loc=in_model_loc, year=y, boundary=bnd, out_gdb=out_gdb_loc)
+   # Update run, to make a new finalized version incorporating updated NLCD/BMI
+   finalizeModel(model=in_model, model_loc=in_model_loc, year="2019", boundary=bnd, out_gdb=out_gdb_loc, upd="2023upd")
+
    # Copy BMI multiplier used for final model to GDB
    bmi_gdb = out_gdb_loc + os.sep + 'ConslandsBMI_Multiplier'
    arcpy.sa.ExtractByMask(bmi_mult, bnd).save(bmi_gdb)

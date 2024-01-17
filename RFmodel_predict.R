@@ -14,7 +14,7 @@
 setwd("D:/git/ConsVision_DevVulnModel")
 library(sf)
 library(randomForest)
-library(raster)
+library(raster)  # todo: update to terra
 library(readxl)
 library(SDMTools)
 library(arcgisbinding)
@@ -94,6 +94,38 @@ pred.adjust <- function(proj.mod, year) {
   
   message('Setting already-developed areas to 101...')
   r.pred.mask <- raster::mask(r.pred2, dev.mask, updatevalue=101, filename = paste0(out.mod, "_final.tif"), overwrite = T, datatype = 'INT2S')
+  return(r.pred.mask)
+}
+
+pred.upd <- function(proj.mod, in.year, upd.year, dev.rast, wat.rast, pmult) {
+  
+  # Model name is the same as project output directory
+  proj.o <- paste0("outputs/", proj.mod)
+  print(proj.mod)
+  out.mod <- paste0(proj.o, "/", proj.mod, "_", in.year)
+  in.pred <- raster(paste0(out.mod, ".tif"))
+  out.rast <- paste0(out.mod, "_final_", upd.year, "upd.tif")
+  message("Creating new raster: ", out.rast, "...")
+  
+  # masks
+  dev.mask <- raster(dev.rast)
+  wat.mask <- raster(wat.rast)
+  # protection multiplier
+  pmult <- raster(pmult)
+  
+  message('Applying protection multiplier...')
+  r.pred2 <- round(in.pred * pmult)
+  
+  message('Setting BMI-1 lands to -1...')
+  prot <- pmult
+  prot[prot==0] <- NA
+  r.pred2 <- raster::mask(r.pred2, prot, updatevalue=-1)
+  
+  message('Applying water mask...')
+  r.pred2 <- raster::mask(r.pred2, wat.mask)
+  
+  message('Setting already-developed areas to 101...')
+  r.pred.mask <- raster::mask(r.pred2, dev.mask, updatevalue=101, filename = out.rast, overwrite = T, datatype = 'INT2S')
   return(r.pred.mask)
 }
 
@@ -228,6 +260,15 @@ indp.validate <- function(proj.mod) {
 # raw <- project(proj.mod, year)
 # adj <- pred.adjust(proj.mod, year)
 # indp.validate(proj.mod)
+
+# to make an updated version of existing model (mask and protection multiplier updates)
+# proj.mod <- "DevVuln_AllVars_20220510"
+# in.year <- "2019"
+# upd.year <- "2023"
+# dev.rast <- "inputs/masks/dev_mask_2021.tif"
+# wat.rast <- "inputs/masks/water_mask_2021.tif"
+# pmult <- "inputs/masks/conslands_pmultBMI_2023.tif"
+# pred.upd(proj.mod, in.year, upd.year, dev.rast, wat.rast, pmult) 
 
 
 # end
